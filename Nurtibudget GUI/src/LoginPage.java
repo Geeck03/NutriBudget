@@ -2,7 +2,7 @@ import javax.swing.*;
 import java.awt.*;
 
 public class LoginPage extends JPanel {
-    public LoginPage(Runnable onLoginSuccess) {
+    public LoginPage(Runnable onLoginSuccess, Runnable onCreateAccount) {
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
@@ -15,6 +15,9 @@ public class LoginPage extends JPanel {
 
         JButton confirmButton = new JButton("Confirm");
         confirmButton.addActionListener(e -> onLoginSuccess.run());
+
+        JButton createAccountButton = new JButton("Create Account");
+        createAccountButton.addActionListener(e -> onCreateAccount.run());
 
         gbc.gridx = 0;
         gbc.gridy = 0;
@@ -35,5 +38,8 @@ public class LoginPage extends JPanel {
         gbc.gridwidth = 2;
         gbc.anchor = GridBagConstraints.CENTER;
         add(confirmButton, gbc);
+
+        gbc.gridy = 3;
+        add(createAccountButton, gbc);
     }
 }
