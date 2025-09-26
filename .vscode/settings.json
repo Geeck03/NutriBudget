@@ -1,0 +1,7 @@
+{
+  "java.project.referencedLibraries": [
+    "Nurtibudget GUI/lib/jfreechart-1.5.5.jar",
+    "Nurtibudget GUI/lib/jakarta.servlet-api-1.2.2.1.jar"
+    
+  ]
+}
