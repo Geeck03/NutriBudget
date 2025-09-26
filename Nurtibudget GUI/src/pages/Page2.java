@@ -1,7 +1,7 @@
 package pages;
 
-import javax.swing.*;
 import java.awt.*;
+import javax.swing.*;
 
 public class Page2 extends JPanel {
     public Page2() {
