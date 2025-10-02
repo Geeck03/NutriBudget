@@ -1,57 +1,33 @@
-import javax.swing.*;
 import java.awt.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import javax.swing.*;
 import pages.*;
+
+
 
 public class Main {
     private JFrame frame;
     private final int pageTotal = 4;
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new Main().start());
+        SwingUtilities.invokeLater(() -> new Main().loginScreen());
     }
-
-    //==================================================================================================================
-    // Start
-
-
-    private void start() {
-        frame = new JFrame("Login");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(600, 400);
-        frame.setLocationRelativeTo(null);
-
-        loginScreen();
-
-        frame.setVisible(true);
-    }
-
 
     //==================================================================================================================
     // Show login screen
 
     private void loginScreen() {
-        frame.setTitle("Login");
-        frame.setContentPane(new LoginPage(
-                this::mainApp,
-                this::accountCreationScreen
-        ));
-        frame.revalidate();
-        frame.repaint();
+        frame = new JFrame("Login");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(600, 400);
+        frame.setLocationRelativeTo(null);
+        frame.setContentPane(new LoginPage(this::mainApp, () -> {}));
+
+        frame.setVisible(true);
     }
-
-    //==================================================================================================================
-    // Account Creation
-
-    private void accountCreationScreen() {
-        frame.setTitle("Create Account");
-        frame.setContentPane(new AccountCreationPage(
-                this::loginScreen,
-                this::loginScreen
-        ));
-        frame.revalidate();
-        frame.repaint();
-    }
-
 
     //==================================================================================================================
     // Swap to main app
@@ -107,12 +83,15 @@ public class Main {
 
         frame.pack();
 
+        //SIZE and Position
         int newWidth = 1200;
         int newHeight = 800;
 
+        // Calculate center point
         int centerX = prevLocation.x + prevSize.width / 2;
         int centerY = prevLocation.y + prevSize.height / 2;
 
+        // Calculate new top-left
         int newX = centerX - newWidth / 2;
         int newY = centerY - newHeight / 2;
 
@@ -128,23 +107,58 @@ public class Main {
 //======================================================================================================================
 
 // image check
-private JButton pageButton(String resourcePath, int width, int height) {
-    java.net.URL imgURL = getClass().getResource(resourcePath);
-    if (imgURL == null) {
-        System.err.println("Image resource not found: " + resourcePath);
-        return null;
+    private JButton pageButton(String resourcePath, int width, int height) {
+        java.net.URL imgURL = getClass().getResource(resourcePath);
+        if (imgURL == null) {
+            System.err.println("Image resource not found: " + resourcePath);
+            return null;
+        }
+
+        ImageIcon originalIcon = new ImageIcon(imgURL);
+        Image scaledImage = originalIcon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+        ImageIcon scaledIcon = new ImageIcon(scaledImage);
+
+        JButton button = new JButton(scaledIcon);
+        button.setBorderPainted(false);
+        button.setFocusPainted(false);
+        button.setContentAreaFilled(false);
+        return button;
     }
 
-    ImageIcon originalIcon = new ImageIcon(imgURL);
-    Image scaledImage = originalIcon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
-    ImageIcon scaledIcon = new ImageIcon(scaledImage);
-
-    JButton button = new JButton(scaledIcon);
-    button.setBorderPainted(false);
-    button.setFocusPainted(false);
-    button.setContentAreaFilled(false);
-    return button;
-}
-
     //==================================================================================================================
+    private String runPythonModel(String inputJson) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("python", "ml_model.py");
+            Process process = pb.start();
+
+            // Send input JSON
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
+            writer.write(inputJson);
+            writer.flush();
+            writer.close();
+
+            // Read output JSON
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            StringBuilder output = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line);
+            }
+
+            reader.close();
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0) {
+                return output.toString(); // JSON output from Python
+            } else {
+                System.err.println("Python process exited with code: " + exitCode);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }
+
+
+
