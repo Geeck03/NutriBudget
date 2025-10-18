@@ -1,0 +1,15 @@
+ingredient_ID	name	cost	calories	protein	carbs	fat
+1	white_rice	0.5	360	7	80	0.5
+2	chicken	1.2	165	31	0	3.6
+3	eggs	0.4	143	13	1	10
+4	broccoli	0.7	34	3	7	0.4
+5	black_beans	0.6	132	9	24	0.5
+6	test		0.4	20	2	32	0.5	23
+7	test again	0.3	23	2	233	2	42
+1	white_rice	0.5	360	7	80	0.5
+2	chicken	1.2	165	31	0	3.6
+3	eggs	0.4	143	13	1	10
+4	broccoli	0.7	34	3	7	0.4
+5	black_beans	0.6	132	9	24	0.5
+6	test		0.4	20	2	32	0.5	23
+7	test again	0.3	23	2	233	2	42	
