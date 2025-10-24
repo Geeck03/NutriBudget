@@ -1,6 +1,7 @@
 
 import requests # Library for making HTTP requests
 import base64 # Library for encoding/decoding data in Base64 format
+import json
 
 from ingredient import Ingredient
 from accessToken import getAccessToken
@@ -13,7 +14,7 @@ from accessToken import getAccessToken
 
 
 def get_ingredient(name: str, location_ID: str) -> Ingredient:
-    search_url = "https://api-ce.kroger.com/v1/products"
+    search_url = "https://api.kroger.com/v1/products"
     # Use the certification envrionment 
 
     # A dictionary of parameters to filter the search results. Will be added to the URL as query parameters.
@@ -21,7 +22,7 @@ def get_ingredient(name: str, location_ID: str) -> Ingredient:
     #  and get data for store #0123456789.”
     params = {
         "filter.term": name,
-        "filter.limit": 5,
+        "filter.limit": 1,
         "filter.locationId": location_ID # Example location ID
     } 
     # Set up the headers for the request, including the authorization token.
@@ -31,7 +32,6 @@ def get_ingredient(name: str, location_ID: str) -> Ingredient:
     token = getAccessToken()
     
     headers = {
-
         "Accept": "application/json",
         "Authorization": f"Bearer {token}"
     }
@@ -45,28 +45,68 @@ def get_ingredient(name: str, location_ID: str) -> Ingredient:
 
     if response.status_code != 200:
         print("Error", response.status_code, response.text)
-        return Ingredient()  # Return an empty Ingredient on error
+        return Ingredient()  # Return an empty Ingredient on error 
     
     data = response.json()  # Get list of json responses
-
+    print("Data from get_ingredient \n")
     print(data)
 
-    '''
+    # print(data)
+
+    
     # Extract product info (first product)
     product = data["data"][0]
-    item = product["items"][0]
+    product_id = product["productId"]
+    items = product["items"][0]
+    price = items.get('price', {}).get('regular', None)  # Regular price or None if missing
+
+    print("Product ID: ", product_id)
+    #price_info = product["items"]["price"]
 
     # Call USDA API for nutrition info here? 
 
     ingredient = Ingredient(
-        name= name,
-        price=item["price"]["regular"]
+        name=name,
+        product_ID=product_id,
+        local_regular=price,
     )
-   '''
+
     
-    ingredient = Ingredient()
-    ingredient.name = name
-    ingredient.price = 0.0
+    #local_regular=item["price"]["regular"]
+    #local_regular=price_info["regular"]
+    #ingredient.name = name 
+    #ingredient. = 0.0
      
     #return ingredient
     return ingredient 
+
+def get_price(ingredient: Ingredient) -> Ingredient:
+
+    ID = ingredient.product_ID
+    print(ID)
+    search_url = f"https://api.kroger.com/v1/products/{ID}" 
+
+    
+    token = getAccessToken()
+    
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
+
+    params = {
+        "filter.locationId": "540FC253" # Example location ID
+    }
+
+
+    response = requests.get(search_url, headers=headers, params=params)
+    
+    if response.status_code != 200:
+        print("Error", response.status_code, response.text)
+        return Ingredient()  # Return an empty Ingredient on error 
+    
+    data = response.json()  # Get list of json responses
+    print("Data from get_price \n")
+    # print(data)
+
+    return Ingredient() 

@@ -20,11 +20,16 @@ class Ingredient:
         fields = asdict(self)
         return ", ".join(f"{key}={value}" for key, value in fields.items())
     
+
+
+    # Product ID 
+    product_ID: str = ""
+    
     # Price info for store
-    local_regular: float = 0.0
-    local_promo: float = 0.0
-    local_promo_per_unit_estimate: float = 0.0
-    local_regular_per_unit_estimate: float = 0.0
+    local_regular: str = ""
+    local_promo: str = ""
+    local_promo_per_unit_estimate: str = ""
+    local_regular_per_unit_estimate: str = ""
 
     #National average price info
     national_regular: float = 0.0
