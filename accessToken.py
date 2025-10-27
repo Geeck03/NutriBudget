@@ -35,7 +35,7 @@ def getAccessToken():
 
 
     auth = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
-    token_url = "https://api-ce.kroger.com/v1/connect/oauth2/token"
+    token_url = "https://api.kroger.com/v1/connect/oauth2/token"
 
     data = {"grant_type": "client_credentials","scope": "product.compact"}
 

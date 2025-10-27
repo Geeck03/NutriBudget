@@ -14,7 +14,7 @@ from accessToken import getAccessToken
 
 
 def location_ID(zipcode: str) -> str:
-    search_url = "https://api-ce.kroger.com/v1/locations" 
+    search_url = "https://api.kroger.com/v1/locations" 
 
 
     token: str = ""

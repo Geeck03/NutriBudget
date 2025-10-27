@@ -8,7 +8,7 @@ from accessToken import getAccessToken
 #Gets a single ingredient from the Kroger API
 # Then adds it to a data class Ingredient
 
-#   'https://api.kroger.com/v1/products?filter.brand={{BRAND}}&filter.term={{TERM}}&filter.locationId={{LOCATION_ID}}' \
+# 'https://api.kroger.com/v1/products?filter.brand={{BRAND}}&filter.term={{TERM}}&filter.locationId={{LOCATION_ID}}' \
 # -H 'Accept: application/json' \
 #  -H 'Authorization: Bearer {{TOKEN}}'
 
@@ -51,16 +51,31 @@ def get_ingredient(name: str, location_ID: str) -> Ingredient:
     print("Data from get_ingredient \n")
     print(data)
 
-    # print(data)
+    print(data)
 
+    
     
     # Extract product info (first product)
     product = data["data"][0]
     product_id = product["productId"]
     items = product["items"][0]
-    price = items.get('price', {}).get('regular', None)  # Regular price or None if missing
+
+
+    # Get Regular Prices 
+    local_regular = items.get('price', {}).get('regular', None)  # Regular price or None if missing
+    regularPerUnitEstimate = items.get('price', {}).get('regularPerUnitEstimate', None)
+    promo = items.get('price', {}).get('promo', None)
+    promoPerUnitEstimate= items.get('price', {}).get('promoPerUnitEstimate', None)
+
+    # Get National Prices 
+    national_regular = items.get('nationalPrice', {}).get('regular', None)
+    national_promo =  items.get('nationalPrice', {}).get('promo', None)
+    national_promo_per_unit_estimate = items.get('nationalPrice', {}).get('promoPerUnitEstimate', None)
+    national_regular_per_unit_estimate = items.get('nationalPrice', {}).get('regularPerUnitEstimate', None)
+
 
     print("Product ID: ", product_id)
+    print("Price: ", local_regular)
     #price_info = product["items"]["price"]
 
     # Call USDA API for nutrition info here? 
@@ -68,7 +83,16 @@ def get_ingredient(name: str, location_ID: str) -> Ingredient:
     ingredient = Ingredient(
         name=name,
         product_ID=product_id,
-        local_regular=price,
+
+
+        local_regular=local_regular,
+        local_regular_per_unit_estimate=regularPerUnitEstimate,
+        local_promo=promo,
+        local_promo_per_unit_estimate=promoPerUnitEstimate,
+        national_regular=national_regular,
+        national_promo=national_promo,
+        national_promo_per_unit_estimate=national_promo_per_unit_estimate,
+        national_regular_per_unit_estimate=national_regular_per_unit_estimate
     )
 
     
@@ -79,6 +103,7 @@ def get_ingredient(name: str, location_ID: str) -> Ingredient:
      
     #return ingredient
     return ingredient 
+
 
 def get_price(ingredient: Ingredient) -> Ingredient:
 
@@ -106,7 +131,7 @@ def get_price(ingredient: Ingredient) -> Ingredient:
         return Ingredient()  # Return an empty Ingredient on error 
     
     data = response.json()  # Get list of json responses
-    print("Data from get_price \n")
+    # print("Data from get_price \n")
     # print(data)
 
     return Ingredient() 
