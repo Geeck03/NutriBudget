@@ -6,7 +6,14 @@ import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+//==============================================================================================================
+// CustomCalendarPanel Class
+//==============================================================================================================
 public class CustomCalendarPanel extends JPanel {
+
+    //==============================================================================================================
+    // Fields and constants
+    //==============================================================================================================
     private final JLabel monthYearLabel;
     private final JPanel calendarGrid;
     private final JTextArea eventTextArea;
@@ -18,16 +25,21 @@ public class CustomCalendarPanel extends JPanel {
     private final JComboBox<String> monthBox;
     private final JSpinner yearSpinner;
 
-    //==================================================================================================================
-    //
-
+    //==============================================================================================================
+    // Constructor
+    //==============================================================================================================
     public CustomCalendarPanel() {
         setLayout(new BorderLayout());
+
+        //==========================================================================================================
+        // Top panel with navigation and selectors
+        //==========================================================================================================
         JPanel topPanel = new JPanel(new BorderLayout());
         JButton prevButton = new JButton("<");
         JButton nextButton = new JButton(">");
         monthYearLabel = new JLabel("", SwingConstants.CENTER);
         monthYearLabel.setFont(new Font("Arial", Font.BOLD, 18));
+
         JPanel selectorPanel = new JPanel();
         String[] months = new java.text.DateFormatSymbols().getMonths();
         monthBox = new JComboBox<>();
@@ -35,40 +47,44 @@ public class CustomCalendarPanel extends JPanel {
             monthBox.addItem(months[i]);
         }
 
-
         yearSpinner = new JSpinner(new SpinnerNumberModel(calendar.get(Calendar.YEAR), 1900, 3000, 1));
         JSpinner.NumberEditor editor = new JSpinner.NumberEditor(yearSpinner, "#");
         yearSpinner.setEditor(editor);
+
         selectorPanel.add(new JLabel("Month:"));
         selectorPanel.add(monthBox);
         selectorPanel.add(new JLabel("Year:"));
         selectorPanel.add(yearSpinner);
+
         topPanel.add(prevButton, BorderLayout.WEST);
         topPanel.add(monthYearLabel, BorderLayout.CENTER);
         topPanel.add(nextButton, BorderLayout.EAST);
         topPanel.add(selectorPanel, BorderLayout.SOUTH);
         add(topPanel, BorderLayout.NORTH);
 
-
+        //==========================================================================================================
         // Calendar grid
+        //==========================================================================================================
         calendarGrid = new JPanel(new GridLayout(0, 7));
         add(calendarGrid, BorderLayout.CENTER);
 
-
+        //==========================================================================================================
         // Bottom panel for event details
+        //==========================================================================================================
         JPanel bottomPanel = new JPanel(new BorderLayout());
         eventTextArea = new JTextArea(3, 40);
         eventTextArea.setLineWrap(true);
         eventTextArea.setWrapStyleWord(true);
         saveButton = new JButton("Save Event");
+
         bottomPanel.add(new JLabel("Event for selected date:"), BorderLayout.NORTH);
         bottomPanel.add(new JScrollPane(eventTextArea), BorderLayout.CENTER);
         bottomPanel.add(saveButton, BorderLayout.EAST);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        //==============================================================================================================
+        //==========================================================================================================
         // Actions
-
+        //==========================================================================================================
         prevButton.addActionListener(e -> {
             calendar.add(Calendar.MONTH, -1);
             syncSelectors();
@@ -104,21 +120,21 @@ public class CustomCalendarPanel extends JPanel {
             updateCalendar();
         });
 
-        //==============================================================================================================
-
+        //==========================================================================================================
+        // Initialization
+        //==========================================================================================================
         loadEventsFromFile();
         syncSelectors();
         updateCalendar();
-
     }
 
-    //==================================================================================================================
-    //
-
+    //==============================================================================================================
+    // Calendar update
+    //==============================================================================================================
     private void updateCalendar() {
         calendarGrid.removeAll();
 
-        // Set month label
+        // Month label
         SimpleDateFormat labelFormat = new SimpleDateFormat("MMMM yyyy");
         monthYearLabel.setText(labelFormat.format(calendar.getTime()));
 
@@ -130,18 +146,18 @@ public class CustomCalendarPanel extends JPanel {
             calendarGrid.add(lbl);
         }
 
-        // Setup date calculations
+        // Date calculations
         Calendar temp = (Calendar) calendar.clone();
         temp.set(Calendar.DAY_OF_MONTH, 1);
         int firstDay = temp.get(Calendar.DAY_OF_WEEK) - 1;
         int daysInMonth = temp.getActualMaximum(Calendar.DAY_OF_MONTH);
 
-        // Fill leading empty cells
+        // Leading empty cells
         for (int i = 0; i < firstDay; i++) {
             calendarGrid.add(new JLabel(""));
         }
 
-        // Fill actual days
+        // Actual days
         for (int day = 1; day <= daysInMonth; day++) {
             int currentDay = day;
             JButton dayButton = new JButton(String.valueOf(day));
@@ -167,17 +183,17 @@ public class CustomCalendarPanel extends JPanel {
         calendarGrid.repaint();
     }
 
-    //==================================================================================================================
-    //
-
+    //==============================================================================================================
+    // Sync dropdowns and year spinner
+    //==============================================================================================================
     private void syncSelectors() {
         monthBox.setSelectedIndex(calendar.get(Calendar.MONTH));
         yearSpinner.setValue(calendar.get(Calendar.YEAR));
     }
 
-    //==================================================================================================================
-    //
-
+    //==============================================================================================================
+    // Save events to file
+    //==============================================================================================================
     private void saveEventsToFile() {
         try (PrintWriter out = new PrintWriter(new FileWriter(EVENT_FILE))) {
             for (Map.Entry<String, String> entry : eventMap.entrySet()) {
@@ -189,11 +205,12 @@ public class CustomCalendarPanel extends JPanel {
         }
     }
 
-    //==================================================================================================================
-    //
-
+    //==============================================================================================================
+    // Load events from file
+    //==============================================================================================================
     private void loadEventsFromFile() {
         if (!EVENT_FILE.exists()) return;
+
         try (BufferedReader reader = new BufferedReader(new FileReader(EVENT_FILE))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -207,8 +224,5 @@ public class CustomCalendarPanel extends JPanel {
             e.printStackTrace();
         }
     }
-
-    //==================================================================================================================
-    //
 
 }

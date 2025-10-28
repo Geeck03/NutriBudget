@@ -1,0 +1,7 @@
+ingredient_ID	name	cost	calories	protein	carbs	fat	description	image_path
+101	grilled_chicken_bowl	3.20	480	45	40	8	A healthy combo of grilled chicken, rice, and veggies.	/pages/images/
+102	veggie_stir_fry	2.10	350	10	60	6	A colorful medley of vegetables sautéed in light soy sauce.	/pages/images/
+103	protein_oatmeal	1.50	420	30	50	9	A balanced breakfast made with oats, eggs, and milk.	/pages/images/
+104	salmon_salad	2.80	390	25	10	22	Fresh salmon with greens, olive oil, and a citrus dressing.	/pages/images/
+105	broccoli_chicken_pasta	2.40	520	38	55	12	A creamy pasta dish with chicken and broccoli.	/pages/images/broccoli_chicken_pasta.jpg
+106	egg_scramble_bowl	1.10	290	18	10	20	Eggs scrambled with veggies and light cheese.	/pages/images/

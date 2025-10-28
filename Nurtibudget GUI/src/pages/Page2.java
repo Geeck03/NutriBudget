@@ -1,6 +1,7 @@
 package pages;
 
 import javax.swing.*;
+import javax.swing.Timer;
 import java.awt.*;
 import java.io.*;
 import java.util.*;
@@ -8,7 +9,9 @@ import java.util.List;
 
 public class Page2 extends JPanel {
 
+    //==============================================================================================================
     // Ingredient class
+    //==============================================================================================================
     public static class Ingredient {
         public int id;
         public String name;
@@ -17,10 +20,10 @@ public class Page2 extends JPanel {
         public int protein;
         public int carbs;
         public double fat;
+        public String description;
+        public String imagePath;
 
-        //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-        public Ingredient(int id, String name, double cost, int calories, int protein, int carbs, double fat) {
+        public Ingredient(int id, String name, double cost, int calories, int protein, int carbs, double fat, String description, String imagePath) {
             this.id = id;
             this.name = name;
             this.cost = cost;
@@ -28,106 +31,216 @@ public class Page2 extends JPanel {
             this.protein = protein;
             this.carbs = carbs;
             this.fat = fat;
+            this.description = description;
+            this.imagePath = imagePath;
         }
     }
 
-    //==================================================================================================================
+    //==============================================================================================================
+    // Recipe class
+    //==============================================================================================================
+    public static class Recipe {
+        public int id;
+        public String name;
+        public double cost;
+        public int calories;
+        public int protein;
+        public int carbs;
+        public double fat;
+        public String description;
+        public String imagePath;
 
+        public Recipe(int id, String name, double cost, int calories, int protein, int carbs, double fat, String description, String imagePath) {
+            this.id = id;
+            this.name = name;
+            this.cost = cost;
+            this.calories = calories;
+            this.protein = protein;
+            this.carbs = carbs;
+            this.fat = fat;
+            this.description = description;
+            this.imagePath = imagePath;
+        }
+    }
+
+    //==============================================================================================================
+    // Instance fields
+    //==============================================================================================================
+    private final Set<Integer> favoriteIngredientIds = new HashSet<>();
+    private final Set<Integer> favoriteRecipeIds = new HashSet<>();
+
+    private final List<Ingredient> ingredients;
+    private final List<Recipe> recipes;
+
+    private JPanel gridPanel;
+    private JScrollPane scrollPane;
+    private JPanel sidebarPanel;
+    private JSplitPane splitPane;
+    private boolean sidebarVisible = false;
+    private Timer sidebarTimer;
+    private int targetDividerLocation;
+    private final int sidebarWidth = 480;
+
+    private boolean showingFavorites = false;
+    private boolean showingIngredients = true;
+
+    private final JButton allButton = new JButton("All");
+    private final JButton favoritesButton = new JButton("Favorites");
+    private final JTextField searchField = new JTextField(20);
+
+    private final JTabbedPane mainTabs = new JTabbedPane();
+
+    //==============================================================================================================
+    // Constructor
+    //==============================================================================================================
     public Page2() {
         setLayout(new BorderLayout());
-        List<Ingredient> ingredients = loadIngredients("ingredients.txt");
-        buildUI(ingredients);
+        ingredients = loadIngredients("ingredients.txt");
+        recipes = loadRecipes("recipes.txt");
+        buildUI();
+
+        SwingUtilities.invokeLater(() -> {
+            splitPane.setDividerLocation(getWidth());
+            sidebarVisible = false;
+        });
     }
 
-    //==================================================================================================================
+    //==============================================================================================================
+    // UI construction
+    //==============================================================================================================
+    private void buildUI() {
+        // Top bar
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
 
-    private void buildUI(List<Ingredient> ingredients) {
-        JPanel gridPanel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.anchor = GridBagConstraints.NORTHWEST;
-        gbc.weightx = 1;
-        gbc.weighty = 0;
-        int col = 0;
-        int row = 0;
-        int maxCols = 3; //changes how many cards appear per row
+        // Search bar
+        searchField.setPreferredSize(new Dimension(250, 28));
+        searchField.putClientProperty("JTextField.placeholderText", "Search...");
+        searchField.addActionListener(e -> refreshGrid());
 
-        //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        // All / Favorites buttons
+        allButton.addActionListener(e -> showAll());
+        favoritesButton.addActionListener(e -> showFavorites());
 
-        for (Ingredient ing : ingredients) {
-            gbc.gridx = col;
-            gbc.gridy = row;
-            gridPanel.add(createCard(ing), gbc);
+        topPanel.add(new JLabel("Search:"));
+        topPanel.add(searchField);
+        topPanel.add(allButton);
+        topPanel.add(favoritesButton);
 
-            col++;
-            if (col >= maxCols) {
-                col = 0;
-                row++;
-            }
+        add(topPanel, BorderLayout.NORTH);
+
+        // Tabs
+        mainTabs.addTab("Ingredients", null);
+        mainTabs.addTab("Recipes", null);
+        mainTabs.addChangeListener(e -> {
+            showingIngredients = mainTabs.getSelectedIndex() == 0;
+            showAll();
+        });
+
+        add(mainTabs, BorderLayout.SOUTH);
+
+        // Grid + sidebar
+        gridPanel = buildGridPanelForIngredients(ingredients);
+        scrollPane = new JScrollPane(gridPanel);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+
+        sidebarPanel = new JPanel(new BorderLayout());
+        sidebarPanel.setPreferredSize(new Dimension(sidebarWidth, 600));
+
+        splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, scrollPane, sidebarPanel);
+        splitPane.setResizeWeight(1.0);
+        splitPane.setDividerSize(0);
+        splitPane.setEnabled(false);
+
+        add(splitPane, BorderLayout.CENTER);
+    }
+
+    //==============================================================================================================
+    // Grid builder
+    //==============================================================================================================
+    private JPanel buildGridPanelForIngredients(List<Ingredient> items) {
+        JPanel grid = new JPanel(new WrapLayout(FlowLayout.LEFT, 15, 15));
+        grid.setBackground(Color.WHITE);
+
+        for (Ingredient ing : items) {
+            if (matchesSearch(ing.name))
+                grid.add(createIngredientCard(ing));
         }
 
-        //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-        gbc.gridx = 0;
-        gbc.gridy = row + 1;
-        gbc.weighty = 1;
-        gridPanel.add(Box.createVerticalGlue(), gbc);
-        JScrollPane scrollPane = new JScrollPane(gridPanel);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        add(scrollPane, BorderLayout.CENTER);
+        return grid;
     }
 
-    //==================================================================================================================
+    private JPanel buildGridPanelForRecipes(List<Recipe> items) {
+        JPanel grid = new JPanel(new WrapLayout(FlowLayout.LEFT, 15, 15));
+        grid.setBackground(Color.WHITE);
 
-    // Create the card for each ingredient
-    private JPanel createCard(Ingredient ing) {
+        for (Recipe r : items) {
+            if (matchesSearch(r.name))
+                grid.add(createRecipeCard(r));
+        }
+
+        return grid;
+    }
+
+    //==============================================================================================================
+    // Card creation
+    //==============================================================================================================
+    private JPanel createIngredientCard(Ingredient ing) {
+        JPanel card = baseCard(ing.name, ing.imagePath);
+        card.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                showSidebar(ing);
+            }
+        });
+        return card;
+    }
+
+    private JPanel createRecipeCard(Recipe r) {
+        JPanel card = baseCard(r.name, r.imagePath);
+        card.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                showSidebar(r);
+            }
+        });
+        return card;
+    }
+
+    private JPanel baseCard(String nameText, String imagePath) {
         JPanel card = new JPanel();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
                 BorderFactory.createEmptyBorder(10, 10, 10, 10)
         ));
-
-        //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
         card.setBackground(new Color(250, 250, 250));
-        card.setPreferredSize(new Dimension(180, 140));
-        JLabel nameLabel = new JLabel(ing.name);
-        nameLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
-        nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        card.setPreferredSize(new Dimension(180, 180));
 
-        //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        JLabel name = new JLabel(nameText, SwingConstants.CENTER);
+        name.setFont(new Font("SansSerif", Font.BOLD, 14));
+        name.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel info = new JLabel(String.format(
-                "<html><div style='text-align:center;'>"
-                        + "Cost: $%.2f<br>"
-                        + "Calories: %d kcal<br>"
-                        + "Protein: %d g<br>"
-                        + "Carbs: %d g<br>"
-                        + "Fat: %.1f g"
-                        + "</div></html>",
-                ing.cost, ing.calories, ing.protein, ing.carbs, ing.fat
-        ));
+        JLabel image = new JLabel();
+        image.setAlignmentX(Component.CENTER_ALIGNMENT);
+        image.setHorizontalAlignment(SwingConstants.CENTER);
+        image.setPreferredSize(new Dimension(120, 90));
 
-        //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        ImageIcon icon = loadImageIcon(imagePath, 120, 90);
+        if (icon != null) image.setIcon(icon);
+        else {
+            image.setText("[No Image]");
+            image.setForeground(Color.GRAY);
+        }
 
-        info.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        info.setAlignmentX(Component.CENTER_ALIGNMENT);
-        card.add(nameLabel);
+        card.add(image);
         card.add(Box.createVerticalStrut(8));
-        card.add(info);
-
-        //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        card.add(name);
 
         card.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseEntered(java.awt.event.MouseEvent e) {
                 card.setBackground(new Color(230, 240, 255));
             }
-
-            //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
             @Override
             public void mouseExited(java.awt.event.MouseEvent e) {
@@ -138,74 +251,303 @@ public class Page2 extends JPanel {
         return card;
     }
 
-    //==================================================================================================================
-
-    // Load ingredients from file with forgiving parsing
-    private List<Ingredient> loadIngredients(String filePath) {
-        List<Ingredient> ingredients = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            String line = br.readLine(); // Skip header
-
-            //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-            while ((line = br.readLine()) != null) {
-                if (line.trim().isEmpty()) continue;
-
-                // Split by tabs, filter out empty fields
-                String[] parts = Arrays.stream(line.split("\t"))
-                        .filter(p -> !p.trim().isEmpty())
-                        .toArray(String[]::new);
-
-                //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-                if (parts.length >= 7) {
-                    try {
-                        int id = Integer.parseInt(parts[0]);
-                        String name = parts[1];
-                        double cost = Double.parseDouble(parts[2]);
-                        int calories = Integer.parseInt(parts[3]);
-                        int protein = Integer.parseInt(parts[4]);
-                        int carbs = Integer.parseInt(parts[5]);
-                        double fat = Double.parseDouble(parts[6]);
-
-                        ingredients.add(new Ingredient(id, name, cost, calories, protein, carbs, fat));
-                    }
-
-                    catch (NumberFormatException e) {
-                        System.err.println("Skipping bad line: " + line);
-                    }
-                }
-
-                //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-                else {
-                    System.err.println("Skipping malformed line: " + line);
-                }
-            }
-        }
-
-        //- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-        catch (IOException e) {
-            e.printStackTrace();
-        }
-        return ingredients;
+    //==============================================================================================================
+    // Sidebar creation
+    //==============================================================================================================
+    private JPanel createSidebarContent(Ingredient ing) {
+        return sidebarTemplate(
+                ing.name, ing.imagePath,
+                String.format("<html>Cost: $%.2f<br>Calories: %d<br>Protein: %d<br>Carbs: %d<br>Fat: %.1f</html>",
+                        ing.cost, ing.calories, ing.protein, ing.carbs, ing.fat),
+                ing.description, ing.id, true
+        );
     }
 
-    //==================================================================================================================
+    private JPanel createSidebarContent(Recipe r) {
+        return sidebarTemplate(
+                r.name, r.imagePath,
+                String.format("<html>Cost: $%.2f<br>Calories: %d<br>Protein: %d<br>Carbs: %d<br>Fat: %.1f</html>",
+                        r.cost, r.calories, r.protein, r.carbs, r.fat),
+                r.description, r.id, false
+        );
+    }
 
-    // Standalone test window
+    private JPanel sidebarTemplate(String name, String imagePath, String info, String desc, int id, boolean isIngredient) {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JButton exitButton = new JButton("✖");
+        exitButton.setFont(new Font("SansSerif", Font.BOLD, 18));
+        exitButton.setFocusPainted(false);
+        exitButton.setContentAreaFilled(false);
+        exitButton.setBorderPainted(false);
+        exitButton.setForeground(Color.DARK_GRAY);
+        exitButton.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        exitButton.addActionListener(e -> hideSidebar());
+        exitButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                exitButton.setForeground(Color.RED);
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                exitButton.setForeground(Color.DARK_GRAY);
+            }
+        });
+
+        JLabel nameLabel = new JLabel(name);
+        nameLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
+        nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        int sidebarImageWidth = sidebarWidth - 80;
+        int sidebarImageHeight = (int) (sidebarImageWidth * 0.6);
+        JLabel imageLabel = new JLabel();
+        imageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        ImageIcon icon = loadImageIcon(imagePath, sidebarImageWidth, sidebarImageHeight);
+        if (icon != null) imageLabel.setIcon(icon);
+        else imageLabel.setText("[No Image]");
+
+        JLabel infoLabel = new JLabel(info);
+        infoLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+
+        JTextArea descArea = new JTextArea(desc == null || desc.isEmpty() ? "No description available." : desc);
+        descArea.setLineWrap(true);
+        descArea.setWrapStyleWord(true);
+        descArea.setEditable(false);
+        descArea.setBackground(new Color(250, 250, 250));
+        descArea.setFont(new Font("SansSerif", Font.PLAIN, 13));
+
+        JButton favoriteButton = new JButton(isIngredient
+                ? (isFavoriteIngredient(id) ? "★ Favorite" : "☆ Favorite")
+                : (isFavoriteRecipe(id) ? "★ Favorite" : "☆ Favorite"));
+        favoriteButton.addActionListener(e -> {
+            if (isIngredient) toggleFavoriteIngredient(id, favoriteButton);
+            else toggleFavoriteRecipe(id, favoriteButton);
+        });
+
+        panel.add(exitButton);
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(nameLabel);
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(imageLabel);
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(infoLabel);
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(new JScrollPane(descArea));
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(favoriteButton);
+
+        return panel;
+    }
+
+    //==============================================================================================================
+    // Sidebar behavior
+    //==============================================================================================================
+    private void showSidebar(Ingredient ing) {
+        sidebarPanel.removeAll();
+        sidebarPanel.add(createSidebarContent(ing), BorderLayout.CENTER);
+        animateSidebar(true);
+    }
+
+    private void showSidebar(Recipe r) {
+        sidebarPanel.removeAll();
+        sidebarPanel.add(createSidebarContent(r), BorderLayout.CENTER);
+        animateSidebar(true);
+    }
+
+    private void hideSidebar() {
+        animateSidebar(false);
+    }
+
+    private void animateSidebar(boolean show) {
+        if (sidebarTimer != null && sidebarTimer.isRunning()) sidebarTimer.stop();
+
+        final int[] current = {splitPane.getDividerLocation()};
+        targetDividerLocation = show ? getWidth() - sidebarWidth : getWidth();
+
+        sidebarTimer = new Timer(10, e -> {
+            int diff = targetDividerLocation - current[0];
+            if (Math.abs(diff) < 4) {
+                splitPane.setDividerLocation(targetDividerLocation);
+                sidebarTimer.stop();
+                if (!show) sidebarPanel.removeAll();
+            } else {
+                current[0] += diff / 5;
+                splitPane.setDividerLocation(current[0]);
+            }
+        });
+        sidebarTimer.start();
+
+        sidebarVisible = show;
+    }
+
+    //==============================================================================================================
+    // Favorites
+    //==============================================================================================================
+    private boolean isFavoriteIngredient(int id) {
+        return favoriteIngredientIds.contains(id);
+    }
+
+    private boolean isFavoriteRecipe(int id) {
+        return favoriteRecipeIds.contains(id);
+    }
+
+    private void toggleFavoriteIngredient(int id, JButton button) {
+        if (isFavoriteIngredient(id)) {
+            favoriteIngredientIds.remove(id);
+            button.setText("☆ Favorite");
+        } else {
+            favoriteIngredientIds.add(id);
+            button.setText("★ Favorite");
+        }
+        refreshGrid();
+    }
+
+    private void toggleFavoriteRecipe(int id, JButton button) {
+        if (isFavoriteRecipe(id)) {
+            favoriteRecipeIds.remove(id);
+            button.setText("☆ Favorite");
+        } else {
+            favoriteRecipeIds.add(id);
+            button.setText("★ Favorite");
+        }
+        refreshGrid();
+    }
+
+    private void showFavorites() {
+        showingFavorites = true;
+        refreshGrid();
+    }
+
+    private void showAll() {
+        showingFavorites = false;
+        refreshGrid();
+    }
+
+    private void refreshGrid() {
+        if (showingIngredients) {
+            List<Ingredient> list = showingFavorites
+                    ? ingredients.stream().filter(i -> favoriteIngredientIds.contains(i.id)).toList()
+                    : ingredients;
+            gridPanel.removeAll();
+            gridPanel = buildGridPanelForIngredients(list);
+        } else {
+            List<Recipe> list = showingFavorites
+                    ? recipes.stream().filter(r -> favoriteRecipeIds.contains(r.id)).toList()
+                    : recipes;
+            gridPanel.removeAll();
+            gridPanel = buildGridPanelForRecipes(list);
+        }
+
+        scrollPane.setViewportView(gridPanel);
+        revalidate();
+        repaint();
+    }
+
+    private boolean matchesSearch(String name) {
+        String query = searchField.getText().trim().toLowerCase();
+        return query.isEmpty() || name.toLowerCase().contains(query);
+    }
+
+    //==============================================================================================================
+    // File loading
+    //==============================================================================================================
+    private List<Ingredient> loadIngredients(String filePath) {
+        List<Ingredient> list = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+            String line = br.readLine();
+            while ((line = br.readLine()) != null) {
+                if (line.trim().isEmpty()) continue;
+                String[] p = line.split("\t");
+                if (p.length >= 7) {
+                    int id = safeParseInt(p[0]);
+                    String name = p[1];
+                    double cost = safeParseDouble(p[2]);
+                    int calories = safeParseInt(p[3]);
+                    int protein = safeParseInt(p[4]);
+                    int carbs = safeParseInt(p[5]);
+                    double fat = safeParseDouble(p[6]);
+                    String desc = p.length > 7 ? p[7] : "";
+                    String img = p.length > 8 ? p[8] : "";
+                    list.add(new Ingredient(id, name, cost, calories, protein, carbs, fat, desc, img));
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    private List<Recipe> loadRecipes(String filePath) {
+        List<Recipe> list = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+            String line = br.readLine();
+            while ((line = br.readLine()) != null) {
+                if (line.trim().isEmpty()) continue;
+                String[] p = line.split("\t");
+                if (p.length >= 7) {
+                    int id = safeParseInt(p[0]);
+                    String name = p[1];
+                    double cost = safeParseDouble(p[2]);
+                    int calories = safeParseInt(p[3]);
+                    int protein = safeParseInt(p[4]);
+                    int carbs = safeParseInt(p[5]);
+                    double fat = safeParseDouble(p[6]);
+                    String desc = p.length > 7 ? p[7] : "";
+                    String img = p.length > 8 ? p[8] : "";
+                    list.add(new Recipe(id, name, cost, calories, protein, carbs, fat, desc, img));
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    private double safeParseDouble(String s) {
+        try {
+            return (s == null || s.isEmpty()) ? 0.0 : Double.parseDouble(s);
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+    }
+
+    private int safeParseInt(String s) {
+        try {
+            return (s == null || s.isEmpty()) ? 0 : Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private ImageIcon loadImageIcon(String path, int width, int height) {
+        if (path == null || path.isEmpty()) return null;
+        try {
+            java.net.URL resource = getClass().getResource(path);
+            if (resource == null) return null;
+            ImageIcon icon = new ImageIcon(resource);
+            Image scaled = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+            return new ImageIcon(scaled);
+        } catch (Exception e) {
+            System.err.println("Failed to load image: " + path);
+            return null;
+        }
+    }
+
+    //==============================================================================================================
+    // Test main
+    //==============================================================================================================
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("Ingredients Page");
+            JFrame frame = new JFrame("Ingredients & Recipes");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(600, 500);
+            frame.setSize(1200, 700);
             frame.setLocationRelativeTo(null);
             frame.setContentPane(new Page2());
             frame.setVisible(true);
         });
     }
-
-    //==================================================================================================================
-
 }
