@@ -95,8 +95,8 @@ public class Page2 extends JPanel {
     //==============================================================================================================
     public Page2() {
         setLayout(new BorderLayout());
-        ingredients = loadIngredients("ingredients.txt");
-        recipes = loadRecipes("recipes.txt");
+        ingredients = loadIngredients("text/ingredients.txt");
+        recipes = loadRecipes("text/recipes.txt");
         buildUI();
 
         SwingUtilities.invokeLater(() -> {
@@ -225,7 +225,7 @@ public class Page2 extends JPanel {
         image.setHorizontalAlignment(SwingConstants.CENTER);
         image.setPreferredSize(new Dimension(120, 90));
 
-        ImageIcon icon = loadImageIcon(imagePath, 120, 90);
+        ImageIcon icon = loadImageIcon("images/" + imagePath, 120, 90);
         if (icon != null) image.setIcon(icon);
         else {
             image.setText("[No Image]");
@@ -252,7 +252,7 @@ public class Page2 extends JPanel {
     }
 
     //==============================================================================================================
-    // Sidebar creation
+    // Sidebar creation and behavior
     //==============================================================================================================
     private JPanel createSidebarContent(Ingredient ing) {
         return sidebarTemplate(
@@ -306,7 +306,7 @@ public class Page2 extends JPanel {
         JLabel imageLabel = new JLabel();
         imageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        ImageIcon icon = loadImageIcon(imagePath, sidebarImageWidth, sidebarImageHeight);
+        ImageIcon icon = loadImageIcon("images/" + imagePath, sidebarImageWidth, sidebarImageHeight);
         if (icon != null) imageLabel.setIcon(icon);
         else imageLabel.setText("[No Image]");
 
@@ -343,9 +343,6 @@ public class Page2 extends JPanel {
         return panel;
     }
 
-    //==============================================================================================================
-    // Sidebar behavior
-    //==============================================================================================================
     private void showSidebar(Ingredient ing) {
         sidebarPanel.removeAll();
         sidebarPanel.add(createSidebarContent(ing), BorderLayout.CENTER);
@@ -453,11 +450,12 @@ public class Page2 extends JPanel {
     }
 
     //==============================================================================================================
-    // File loading
+    // File loading (from src/pages/text/)
     //==============================================================================================================
     private List<Ingredient> loadIngredients(String filePath) {
         List<Ingredient> list = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+        try (InputStream in = getClass().getResourceAsStream(filePath);
+             BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
             String line = br.readLine();
             while ((line = br.readLine()) != null) {
                 if (line.trim().isEmpty()) continue;
@@ -475,7 +473,8 @@ public class Page2 extends JPanel {
                     list.add(new Ingredient(id, name, cost, calories, protein, carbs, fat, desc, img));
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
+            System.err.println("Error loading ingredients from: " + filePath);
             e.printStackTrace();
         }
         return list;
@@ -483,7 +482,8 @@ public class Page2 extends JPanel {
 
     private List<Recipe> loadRecipes(String filePath) {
         List<Recipe> list = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+        try (InputStream in = getClass().getResourceAsStream(filePath);
+             BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
             String line = br.readLine();
             while ((line = br.readLine()) != null) {
                 if (line.trim().isEmpty()) continue;
@@ -501,7 +501,8 @@ public class Page2 extends JPanel {
                     list.add(new Recipe(id, name, cost, calories, protein, carbs, fat, desc, img));
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
+            System.err.println("Error loading recipes from: " + filePath);
             e.printStackTrace();
         }
         return list;
@@ -524,10 +525,12 @@ public class Page2 extends JPanel {
     }
 
     private ImageIcon loadImageIcon(String path, int width, int height) {
-        if (path == null || path.isEmpty()) return null;
         try {
             java.net.URL resource = getClass().getResource(path);
-            if (resource == null) return null;
+            if (resource == null) {
+                System.err.println("Image not found: " + path);
+                return null;
+            }
             ImageIcon icon = new ImageIcon(resource);
             Image scaled = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
             return new ImageIcon(scaled);
@@ -545,8 +548,7 @@ public class Page2 extends JPanel {
             JFrame frame = new JFrame("Ingredients & Recipes");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.setSize(1200, 700);
-            frame.setLocationRelativeTo(null);
-            frame.setContentPane(new Page2());
+            frame.add(new Page2());
             frame.setVisible(true);
         });
     }
