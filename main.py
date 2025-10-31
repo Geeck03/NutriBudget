@@ -22,7 +22,7 @@ def main():
     ingredient = Ingredient(); 
 
     # 01400943
-    ingredient = get_ingredient("coffee", "03400397")
+    ingredient = get_ingredient("apple", "03400397")
     ingredient.describe()
 
     nameThing = ingredient.name

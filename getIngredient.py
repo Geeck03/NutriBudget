@@ -13,6 +13,12 @@ from accessToken import getAccessToken
 #  -H 'Authorization: Bearer {{TOKEN}}'
 
 
+# Separate concerns 
+# Create a search function for ingredients 
+# Add each ingredient to an Ingredient data class
+# Return the Ingredient data classes to the UI 
+
+
 def get_ingredient(name: str, location_ID: str) -> Ingredient:
     search_url = "https://api.kroger.com/v1/products"
     # Use the certification envrionment 
@@ -48,10 +54,10 @@ def get_ingredient(name: str, location_ID: str) -> Ingredient:
         return Ingredient()  # Return an empty Ingredient on error 
     
     data = response.json()  # Get list of json responses
-    print("Data from get_ingredient \n")
+    # print("Data from get_ingredient \n")
     print(data)
 
-    print(data)
+    # print(data)
 
     
     
@@ -59,6 +65,12 @@ def get_ingredient(name: str, location_ID: str) -> Ingredient:
     product = data["data"][0]
     product_id = product["productId"]
     items = product["items"][0]
+
+
+    # Get Nutrients Info
+    # Gets JSON of nutrition info
+    nutrition = product["nutritionInformation"][0]
+    print("Nutrition Info: ", nutrition)
 
 
     # Get Regular Prices 
@@ -96,10 +108,9 @@ def get_ingredient(name: str, location_ID: str) -> Ingredient:
     )
 
     
-    #local_regular=item["price"]["regular"]
-    #local_regular=price_info["regular"]
-    #ingredient.name = name 
-    #ingredient. = 0.0
+    # Add me! 
+    # Functionality for nutrition info can be added here
+    #Get info serving size 
      
     #return ingredient
     return ingredient 
