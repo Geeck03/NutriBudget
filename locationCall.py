@@ -2,7 +2,6 @@
 import requests # Library for making HTTP requests
 import base64 # Library for encoding/decoding data in Base64 format
 
-from getIngredient import get_ingredient
 from ingredient import Ingredient
 from accessToken import getAccessToken
 

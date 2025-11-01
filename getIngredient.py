@@ -1,39 +1,46 @@
-
 import requests # Library for making HTTP requests
 import base64 # Library for encoding/decoding data in Base64 format
 import json
+from typing import List, Optional, Dict, Any
 
-from ingredient import Ingredient
-from accessToken import getAccessToken
-#Gets a single ingredient from the Kroger API
-# Then adds it to a data class Ingredient
+# Our Files 
+from ingredient import Ingredient # Ingredient data class
+from ingredient import nutrientInfo # nutrientInfo data class
+from accessToken import getAccessToken 
 
-# 'https://api.kroger.com/v1/products?filter.brand={{BRAND}}&filter.term={{TERM}}&filter.locationId={{LOCATION_ID}}' \
-# -H 'Accept: application/json' \
-#  -H 'Authorization: Bearer {{TOKEN}}'
+'''
+Search Ingredients Functionality
+Expected Input: name of ingredient (string) and search number (int) (expected number of results)
+Expected Output: List of Ingredient data class objects
+'''
 
+# Search for ingredients by name and location ID and search_number (desired number of results)
 
-# Separate concerns 
-# Create a search function for ingredients 
-# Add each ingredient to an Ingredient data class
-# Return the Ingredient data classes to the UI 
-
-
-def get_ingredient(name: str, location_ID: str) -> Ingredient:
+def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
     search_url = "https://api.kroger.com/v1/products"
-    # Use the certification envrionment 
-
-    # A dictionary of parameters to filter the search results. Will be added to the URL as query parameters.
-    # “Search for a product called banana, limit results to 1,
-    #  and get data for store #0123456789.”
+    
+    
+    '''
+     For location ID, we can either hardcode a value for testing or
+     implement a function to get location ID based on zip code.
+     '''
+    # Add Location id based on zip code later 
+    location_ID = "03400397"  # Example location ID 
+    
+    # Edage case: if search number is less than or equal to 0, return empty list
+    if search_number <= 0:
+        return []
+    
+    '''
+    API call 
+    '''    
+    
     params = {
         "filter.term": name,
-        "filter.limit": 1,
+        "filter.limit": search_number,
         "filter.locationId": location_ID # Example location ID
     } 
-    # Set up the headers for the request, including the authorization token.
 
-    # Function from get.py 
     token: str = ""
     token = getAccessToken()
     
@@ -44,105 +51,130 @@ def get_ingredient(name: str, location_ID: str) -> Ingredient:
 
     response = requests.get(search_url, headers=headers, params=params)
 
-    # .json() method to parse the JSON response into a Python dictionary.
-    # ["data"] accesses the "data" key from the JSON.
-    # (Kroger’s API wraps product results in a "data" array.)
-    # [0] picks the first product returned.
-
     if response.status_code != 200:
         print("Error", response.status_code, response.text)
-        return Ingredient()  # Return an empty Ingredient on error 
-    
-    data = response.json()  # Get list of json responses
-    # print("Data from get_ingredient \n")
-    print(data)
-
-    # print(data)
-
+        return []  # Return an empty Ingredient on error 
     
     
-    # Extract product info (first product)
-    product = data["data"][0]
-    product_id = product["productId"]
-    items = product["items"][0]
-
-
-    # Get Nutrients Info
-    # Gets JSON of nutrition info
-    nutrition = product["nutritionInformation"][0]
-    print("Nutrition Info: ", nutrition)
-
-
-    # Get Regular Prices 
-    local_regular = items.get('price', {}).get('regular', None)  # Regular price or None if missing
-    regularPerUnitEstimate = items.get('price', {}).get('regularPerUnitEstimate', None)
-    promo = items.get('price', {}).get('promo', None)
-    promoPerUnitEstimate= items.get('price', {}).get('promoPerUnitEstimate', None)
-
-    # Get National Prices 
-    national_regular = items.get('nationalPrice', {}).get('regular', None)
-    national_promo =  items.get('nationalPrice', {}).get('promo', None)
-    national_promo_per_unit_estimate = items.get('nationalPrice', {}).get('promoPerUnitEstimate', None)
-    national_regular_per_unit_estimate = items.get('nationalPrice', {}).get('regularPerUnitEstimate', None)
-
-
-    print("Product ID: ", product_id)
-    print("Price: ", local_regular)
-    #price_info = product["items"]["price"]
-
-    # Call USDA API for nutrition info here? 
-
-    ingredient = Ingredient(
-        name=name,
-        product_ID=product_id,
-
-
-        local_regular=local_regular,
-        local_regular_per_unit_estimate=regularPerUnitEstimate,
-        local_promo=promo,
-        local_promo_per_unit_estimate=promoPerUnitEstimate,
-        national_regular=national_regular,
-        national_promo=national_promo,
-        national_promo_per_unit_estimate=national_promo_per_unit_estimate,
-        national_regular_per_unit_estimate=national_regular_per_unit_estimate
-    )
-
+    '''
+    Parse Response and create Ingredient objects
+    '''
     
-    # Add me! 
-    # Functionality for nutrition info can be added here
-    #Get info serving size 
-     
-    #return ingredient
-    return ingredient 
+    data = response.json()  # Get list of json responses. Kroger returns two dicts: "meta" and "data"
+    products = data.get("data", []) or [] # Get list of products from "data" key
 
 
-def get_price(ingredient: Ingredient) -> Ingredient:
-
-    ID = ingredient.product_ID
-    print(ID)
-    search_url = f"https://api.kroger.com/v1/products/{ID}" 
-
+    # Edge case: no products found
+    if not products:
+        print("No products found.")
+        return []
     
-    token = getAccessToken()
+    # Create list to hold Ingredient objects
+    ingredients_class_list: List[Ingredient] = []
     
-    headers = {
-        "Accept": "application/json",
-        "Authorization": f"Bearer {token}"
-    }
-
-    params = {
-        "filter.locationId": "540FC253" # Example location ID
-    }
+    # Limit results to search_number or available products whatever number is smaller  
+    limit = min(search_number, len(products))
 
 
-    response = requests.get(search_url, headers=headers, params=params)
+    ''' 
+    Loop through each product in the response and extract relevant information
+    '''
     
-    if response.status_code != 200:
-        print("Error", response.status_code, response.text)
-        return Ingredient()  # Return an empty Ingredient on error 
-    
-    data = response.json()  # Get list of json responses
-    # print("Data from get_price \n")
-    # print(data)
+    for i in range (limit):
+        product = products[i] # Extract single product dict
+        product_id = product.get("productId", "") # Get product ID key value 
+        # Get display name if there is not display name, use recipet description, if neither use name
+        name_of_product = product.get("description") or product.get("receiptDescription") or name 
 
-    return Ingredient() 
+        # Dictionary object filled with nutrient information
+        nutri_info = product.get("nutritionInformation") or {}
+       
+       
+        # Normalize response: Sometimes kroger returns a list another times a dict. Make sure we always have a dict to work with
+        if isinstance(nutri_info, dict): 
+            nutri_info = nutri_info
+        elif isinstance(nutri_info, list):
+            nutri_info = nutri_info[0] if nutri_info else {}
+        else:
+            nutri_info = {}
+            
+        # Get list of nutrients    
+        nutrients_list = nutri_info.get("nutrients", []) or []
+        
+        # Create list to hold nutrientInfo objects
+        nutrient_objs: List[nutrientInfo] = []
+        
+        ''' 
+        Loop through each nutrient and create nutrientInfo objects 
+        '''
+        
+        for nutrient in nutrients_list:
+           # Unit of measure extraction
+           unit_of_measure = (nutrient.get("unitOfMeasure") or {}).get("name", "")
+           unit = unit_of_measure.get("name", "") if isinstance(unit_of_measure, dict) else str(unit_of_measure)
+                
+                
+           displayName = nutrient.get("displayName") or nutrient.get("code") or "Unknown"
+           code = nutrient.get("code", "")
+           description = nutrient.get("description", "")
+           qty = nutrient.get("quantity")
+           unit = (nutrient.get("unitOfMeasure") or {}).get("abbreviation") or (nutrient.get("unitOfMeasure") or {}).get("name") or ""
+           pdv = nutrient.get("percentDailyIntake")
+                
+           # Create nutrientInfo object
+           nutrient = nutrientInfo(
+              displayName=displayName,
+              code=code, 
+              description=description,
+              quantity=qty,
+              percentDailyIntake=pdv,
+              unitOfMeasure=unit, 
+            )                
+                
+    
+            # Add nutrient object to list
+            # Will add this list to the Ingredient data class later
+           nutrient_objs.append(nutrient)
+            
+    
+
+        '''
+        Getting the price information 
+        
+        '''
+        
+        # Takes the first item/SKU
+        items_list = product.get("items") or [] 
+        item: Dict[str, Any] = items_list[0] if items_list else{} 
+    
+        # Local price block (dict or {})
+        price = item.get("price", {}) or {} 
+        local_regular = price.get("regular")
+        local_regular_per_unit_estimate = price.get("regularPerUnitEstimate") 
+        local_promo = price.get("promo")
+        local_promo_per_unit_estimate = price.get("promoPerUnitEstimate")
+
+        # National price block (dict or {})
+        nprice = item.get("nationalPrice", {}) or {}
+        national_regular = nprice.get("regular")
+        national_promo = nprice.get("promo")
+        national_promo_per_unit_estimate = nprice.get("promoPerUnitEstimate")
+        national_regular_per_unit_estimate = nprice.get("regularPerUnitEstimate")
+        
+        
+        ingredient = Ingredient(
+            name=name_of_product,
+            product_ID=product_id,
+            nutrients = nutrient_objs,
+            local_regular=local_regular,
+            local_regular_per_unit_estimate = local_regular_per_unit_estimate,
+            local_promo=local_promo,
+            local_promo_per_unit_estimate= local_promo_per_unit_estimate,
+            national_regular=national_regular,
+            national_promo=national_promo,
+            national_promo_per_unit_estimate=national_promo_per_unit_estimate,
+            national_regular_per_unit_estimate=national_regular_per_unit_estimate
+        )
+        ingredients_class_list.append(ingredient)
+        nutrient_objs = []  # Clear nutrient objects list for next ingredient
+    return ingredients_class_list
