@@ -76,8 +76,9 @@ public class Page2 extends JPanel {
     private final Set<Integer> favoriteIngredientIds = new HashSet<>();
     private final Set<Integer> favoriteRecipeIds = new HashSet<>();
     private final JComboBox<String> filterDropdown = new JComboBox<>(new String[] {
-    "All", "Vegetarian", "Vegan"
+        "All", "A+", "A", "B", "C", "D", "E"
     });
+
 
 
     private final List<Ingredient> ingredients;
@@ -182,7 +183,7 @@ public class Page2 extends JPanel {
 
         add(splitPane, BorderLayout.CENTER);
 
-        topPanel.add(new JLabel("Filter:"));
+        topPanel.add(new JLabel("NutriScore:"));
         filterDropdown.setPreferredSize(new Dimension(120, 28));
         filterDropdown.addActionListener(e -> refreshGrid()); // dynamically refresh on selection
         topPanel.add(filterDropdown);
