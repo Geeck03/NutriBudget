@@ -29,6 +29,7 @@ class Ingredient:
             self.name,
             self.product_ID,
             f"Serving Size : {self.serving_size} {self.serving_size_unit}",
+            f"Servings per Container: {self.servings_per_container}",
             #f"Serving Size Description: ({self.serving_size_description})",
             f"----------------------------------------",
             f"Price Information:",
@@ -56,7 +57,7 @@ class Ingredient:
     serving_size: float = 0 # default per 100g
     #serving_size_description: str = ""
     serving_size_unit: str = ""
-    
+    servings_per_container: float = 0.0
     
     nutrients: List[nutrientInfo] = field(default_factory=list) #Empty List of nutrientInfo objects
     
@@ -65,6 +66,9 @@ class Ingredient:
     local_promo: str = ""
     local_promo_per_unit_estimate: str = ""
     local_regular_per_unit_estimate: str = ""
+    
+    # Can implement price per serving later
+    # Price per serving is: servings_per_container / local_regular 
 
     #National average price info
     national_regular: float = 0.0

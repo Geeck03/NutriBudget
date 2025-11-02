@@ -98,6 +98,17 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
         else:
             nutri_info = {}
             
+        servings_per_package = nutri_info.get("servingsPerPackage", 0.0) or 0.0
+        
+        if isinstance(servings_per_package, dict): 
+            servings_per_package = servings_per_package
+        elif isinstance(servings_per_package, float):
+            servings_per_package = servings_per_package[0] if servings_per_package else {}
+        else:
+            servings_per_package = {}
+            
+        servings_per_container = servings_per_package.get("value", 0.0) or 0.0
+            
         
         # Get the serving size information
         serving_dict = nutri_info.get("servingSize", {}) or {}
@@ -188,6 +199,7 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
         ingredient = Ingredient(
             name=name_of_product,
             product_ID=product_id,
+            servings_per_container=servings_per_container,
             serving_size=serving_size_quantity,
             #serving_size_description=serving_size_description,
             serving_size_unit=serving_size_name,
