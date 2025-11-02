@@ -4,12 +4,12 @@ import java.awt.*;
 import java.io.*;
 import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
+
 import javax.swing.*;
 import javax.swing.Timer;
 
-
-
-
+import org.jfree.chart.util.StringUtils;
 
 public class Page2 extends JPanel {
 
@@ -53,6 +53,9 @@ public class Page2 extends JPanel {
         public double fat;
         public String description;
         public String imagePath;
+        List<Ingredient> ingredients;
+    List<Recipe> recipes;
+
 
         public Recipe(int id, String name, double cost, int calories, int protein, int carbs, double fat, String description, String imagePath) {
             this.id = id;
@@ -72,6 +75,10 @@ public class Page2 extends JPanel {
     //==============================================================================================================
     private final Set<Integer> favoriteIngredientIds = new HashSet<>();
     private final Set<Integer> favoriteRecipeIds = new HashSet<>();
+    private final JComboBox<String> filterDropdown = new JComboBox<>(new String[] {
+    "All", "Vegetarian", "Vegan"
+    });
+
 
     private final List<Ingredient> ingredients;
     private final List<Recipe> recipes;
@@ -116,25 +123,27 @@ public class Page2 extends JPanel {
         // Top bar
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
 
+
         // Search bar
         searchField.setPreferredSize(new Dimension(250, 28));
         searchField.putClientProperty("JTextField.placeholderText", "Search...");
+        // Dynamic search on typing
         searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-        @Override
-        public void insertUpdate(javax.swing.event.DocumentEvent e) {
-            refreshGrid();
-        }
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                refreshGrid();
+            }
 
-        @Override
-        public void removeUpdate(javax.swing.event.DocumentEvent e) {
-            refreshGrid();
-        }
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                refreshGrid();
+            }
 
-        @Override
-        public void changedUpdate(javax.swing.event.DocumentEvent e) {
-            refreshGrid();
-        }
-    });
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                refreshGrid();
+            }
+        });
 
 
         // All / Favorites buttons
@@ -172,6 +181,11 @@ public class Page2 extends JPanel {
         splitPane.setEnabled(false);
 
         add(splitPane, BorderLayout.CENTER);
+
+        topPanel.add(new JLabel("Filter:"));
+        filterDropdown.setPreferredSize(new Dimension(120, 28));
+        filterDropdown.addActionListener(e -> refreshGrid()); // dynamically refresh on selection
+        topPanel.add(filterDropdown);
     }
 
     //==============================================================================================================
@@ -181,9 +195,9 @@ public class Page2 extends JPanel {
         JPanel grid = new JPanel(new WrapLayout(FlowLayout.LEFT, 15, 15));
         grid.setBackground(Color.WHITE);
 
+        // All items are already filtered by smartSearch in refreshGrid
         for (Ingredient ing : items) {
-            if (matchesSearch(ing.name))
-                grid.add(createIngredientCard(ing));
+            grid.add(createIngredientCard(ing));
         }
 
         return grid;
@@ -193,13 +207,14 @@ public class Page2 extends JPanel {
         JPanel grid = new JPanel(new WrapLayout(FlowLayout.LEFT, 15, 15));
         grid.setBackground(Color.WHITE);
 
+        // All items are already filtered by smartSearch in refreshGrid
         for (Recipe r : items) {
-            if (matchesSearch(r.name))
-                grid.add(createRecipeCard(r));
+            grid.add(createRecipeCard(r));
         }
 
         return grid;
     }
+
 
     //==============================================================================================================
     // Card creation
@@ -445,16 +460,41 @@ public class Page2 extends JPanel {
     }
 
     private void refreshGrid() {
+        String query = searchField.getText().trim();
+
         if (showingIngredients) {
+            // Start with either favorites or all ingredients
             List<Ingredient> list = showingFavorites
                     ? ingredients.stream().filter(i -> favoriteIngredientIds.contains(i.id)).toList()
-                    : ingredients;
+                    : new ArrayList<>(ingredients);
+
+            if (!query.isEmpty()) {
+                // Convert Ingredient objects to strings for searching
+                List<String> names = list.stream().map(i -> i.name).toList();
+                List<String> matchedNames = SearchAlgorithms.smartSearch(query, names);
+
+                // Filter original list based on matched names
+                Set<String> matchedSet = new HashSet<>(matchedNames); // no scores
+                list = list.stream().filter(i -> matchedSet.contains(i.name)).toList();
+            }
+
             gridPanel.removeAll();
             gridPanel = buildGridPanelForIngredients(list);
+
         } else {
+            // Start with either favorites or all recipes
             List<Recipe> list = showingFavorites
                     ? recipes.stream().filter(r -> favoriteRecipeIds.contains(r.id)).toList()
-                    : recipes;
+                    : new ArrayList<>(recipes);
+
+            if (!query.isEmpty()) {
+                List<String> names = list.stream().map(r -> r.name).toList();
+                List<String> matchedNames = SearchAlgorithms.smartSearch(query, names);
+
+                Set<String> matchedSet = new HashSet<>(matchedNames); // no scores
+                list = list.stream().filter(r -> matchedSet.contains(r.name)).toList();
+            }
+
             gridPanel.removeAll();
             gridPanel = buildGridPanelForRecipes(list);
         }
@@ -464,10 +504,6 @@ public class Page2 extends JPanel {
         repaint();
     }
 
-    private boolean matchesSearch(String name) {
-        String query = searchField.getText().trim().toLowerCase();
-        return query.isEmpty() || name.toLowerCase().contains(query);
-    }
 
     //==============================================================================================================
     // File loading (from src/pages/text/)
