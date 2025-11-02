@@ -4,12 +4,8 @@ import java.awt.*;
 import java.io.*;
 import java.util.*;
 import java.util.List;
-import java.util.stream.Collectors;
-
 import javax.swing.*;
 import javax.swing.Timer;
-
-import org.jfree.chart.util.StringUtils;
 
 
 
@@ -57,9 +53,6 @@ public class Page2 extends JPanel {
         public double fat;
         public String description;
         public String imagePath;
-        List<Ingredient> ingredients;
-    List<Recipe> recipes;
-
 
         public Recipe(int id, String name, double cost, int calories, int protein, int carbs, double fat, String description, String imagePath) {
             this.id = id;
@@ -79,12 +72,6 @@ public class Page2 extends JPanel {
     //==============================================================================================================
     private final Set<Integer> favoriteIngredientIds = new HashSet<>();
     private final Set<Integer> favoriteRecipeIds = new HashSet<>();
-    private final JComboBox<String> nutriScoreDropdown = new JComboBox<>(new String[] {
-        "All", "A+", "A", "B", "C", "D", "E"
-    });
-
-
-
 
     private final List<Ingredient> ingredients;
     private final List<Recipe> recipes;
@@ -106,8 +93,6 @@ public class Page2 extends JPanel {
     private final JTextField searchField = new JTextField(20);
 
     private final JTabbedPane mainTabs = new JTabbedPane();
-
-    
 
     //==============================================================================================================
     // Constructor
@@ -131,28 +116,10 @@ public class Page2 extends JPanel {
         // Top bar
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
 
-
         // Search bar
         searchField.setPreferredSize(new Dimension(250, 28));
         searchField.putClientProperty("JTextField.placeholderText", "Search...");
-        // Dynamic search on typing
-        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            @Override
-            public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                refreshGrid();
-            }
-
-            @Override
-            public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                refreshGrid();
-            }
-
-            @Override
-            public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                refreshGrid();
-            }
-        });
-
+        searchField.addActionListener(e -> refreshGrid());
 
         // All / Favorites buttons
         allButton.addActionListener(e -> showAll());
@@ -189,12 +156,6 @@ public class Page2 extends JPanel {
         splitPane.setEnabled(false);
 
         add(splitPane, BorderLayout.CENTER);
-
-        topPanel.add(new JLabel("NutriScore:"));
-        nutriScoreDropdown.setPreferredSize(new Dimension(80, 28));
-        nutriScoreDropdown.addActionListener(e -> refreshGrid());
-        topPanel.add(nutriScoreDropdown);
-
     }
 
     //==============================================================================================================
@@ -204,9 +165,9 @@ public class Page2 extends JPanel {
         JPanel grid = new JPanel(new WrapLayout(FlowLayout.LEFT, 15, 15));
         grid.setBackground(Color.WHITE);
 
-        // All items are already filtered by smartSearch in refreshGrid
         for (Ingredient ing : items) {
-            grid.add(createIngredientCard(ing));
+            if (matchesSearch(ing.name))
+                grid.add(createIngredientCard(ing));
         }
 
         return grid;
@@ -216,14 +177,13 @@ public class Page2 extends JPanel {
         JPanel grid = new JPanel(new WrapLayout(FlowLayout.LEFT, 15, 15));
         grid.setBackground(Color.WHITE);
 
-        // All items are already filtered by smartSearch in refreshGrid
         for (Recipe r : items) {
-            grid.add(createRecipeCard(r));
+            if (matchesSearch(r.name))
+                grid.add(createRecipeCard(r));
         }
 
         return grid;
     }
-
 
     //==============================================================================================================
     // Card creation
@@ -469,51 +429,16 @@ public class Page2 extends JPanel {
     }
 
     private void refreshGrid() {
-        String query = searchField.getText().trim();
-
-    if (showingIngredients) {
-        // Start with either favorites or all ingredients
-        List<Ingredient> list = showingFavorites
-                ? ingredients.stream().filter(i -> favoriteIngredientIds.contains(i.id)).toList()
-                : new ArrayList<>(ingredients);
-
-        // Filter by search query
-        if (!query.isEmpty()) {
-            List<String> names = list.stream().map(i -> i.name).toList();
-            List<String> matchedNames = SearchAlgorithms.smartSearch(query, names);
-            Set<String> matchedSet = new HashSet<>(matchedNames);
-            list = list.stream().filter(i -> matchedSet.contains(i.name)).toList();
-        }
-
-        // Filter by NutriScore grade
-        String selectedGrade = (String) nutriScoreDropdown.getSelectedItem();
-        if (selectedGrade != null && !selectedGrade.equals("All")) {
-            list = list.stream()
-                    .filter(i -> {
-                        Map<String, Object> result = nutriScore.calculateComprehensiveScore(i);
-                        String grade = (String) result.get("grade");
-                        return selectedGrade.equals(grade);
-                    })
-                    .toList();
-        }
-
-        gridPanel.removeAll();
-        gridPanel = buildGridPanelForIngredients(list);
-
+        if (showingIngredients) {
+            List<Ingredient> list = showingFavorites
+                    ? ingredients.stream().filter(i -> favoriteIngredientIds.contains(i.id)).toList()
+                    : ingredients;
+            gridPanel.removeAll();
+            gridPanel = buildGridPanelForIngredients(list);
         } else {
-            // Start with either favorites or all recipes
             List<Recipe> list = showingFavorites
                     ? recipes.stream().filter(r -> favoriteRecipeIds.contains(r.id)).toList()
-                    : new ArrayList<>(recipes);
-
-            if (!query.isEmpty()) {
-                List<String> names = list.stream().map(r -> r.name).toList();
-                List<String> matchedNames = SearchAlgorithms.smartSearch(query, names);
-
-                Set<String> matchedSet = new HashSet<>(matchedNames); // no scores
-                list = list.stream().filter(r -> matchedSet.contains(r.name)).toList();
-            }
-
+                    : recipes;
             gridPanel.removeAll();
             gridPanel = buildGridPanelForRecipes(list);
         }
@@ -523,6 +448,10 @@ public class Page2 extends JPanel {
         repaint();
     }
 
+    private boolean matchesSearch(String name) {
+        String query = searchField.getText().trim().toLowerCase();
+        return query.isEmpty() || name.toLowerCase().contains(query);
+    }
 
     //==============================================================================================================
     // File loading (from src/pages/text/)
