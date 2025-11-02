@@ -119,7 +119,23 @@ public class Page2 extends JPanel {
         // Search bar
         searchField.setPreferredSize(new Dimension(250, 28));
         searchField.putClientProperty("JTextField.placeholderText", "Search...");
-        searchField.addActionListener(e -> refreshGrid());
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+        @Override
+        public void insertUpdate(javax.swing.event.DocumentEvent e) {
+            refreshGrid();
+        }
+
+        @Override
+        public void removeUpdate(javax.swing.event.DocumentEvent e) {
+            refreshGrid();
+        }
+
+        @Override
+        public void changedUpdate(javax.swing.event.DocumentEvent e) {
+            refreshGrid();
+        }
+    });
+
 
         // All / Favorites buttons
         allButton.addActionListener(e -> showAll());
