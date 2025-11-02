@@ -88,7 +88,7 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
 
         # Dictionary object filled with nutrient information
         nutri_info = product.get("nutritionInformation") or {}
-       
+        
        
         # Normalize response: Sometimes kroger returns a list another times a dict. Make sure we always have a dict to work with
         if isinstance(nutri_info, dict): 
@@ -97,6 +97,29 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
             nutri_info = nutri_info[0] if nutri_info else {}
         else:
             nutri_info = {}
+            
+        
+        # Get the serving size information
+        serving_dict = nutri_info.get("servingSize", {}) or {}
+        if isinstance(serving_dict, dict): 
+            serving_dict = serving_dict
+        elif isinstance(serving_dict, list):
+            serving_dict = serving_dict[0] if serving_dict else {}
+        else:
+            serving_dict = {}
+        serving_size_quantity = serving_dict.get("quantity", 0.0) or 0.0
+        #serving_size_description = serving_dict.get("description", "") or "No Description"
+        
+        serving_size_unit = serving_dict.get("unitOfMeasure", "") or ""
+        
+        if isinstance(serving_size_unit, dict): 
+            serving_size_unit = serving_size_unit
+        elif isinstance(serving_size_unit, str):
+            serving_size_unit = serving_size_unit[0] if serving_size_unit else {}
+        else:
+            serving_size_unit = {} 
+        print(serving_size_unit)
+        serving_size_name = serving_size_unit.get("abbreviation", "") or serving_size_unit.get("name", "") or "Unknown serving size unit"
             
         # Get list of nutrients    
         nutrients_list = nutri_info.get("nutrients", []) or []
@@ -165,6 +188,9 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
         ingredient = Ingredient(
             name=name_of_product,
             product_ID=product_id,
+            serving_size=serving_size_quantity,
+            #serving_size_description=serving_size_description,
+            serving_size_unit=serving_size_name,
             nutrients = nutrient_objs,
             local_regular=local_regular,
             local_regular_per_unit_estimate = local_regular_per_unit_estimate,

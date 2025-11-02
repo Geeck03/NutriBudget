@@ -15,13 +15,17 @@ from typing import List, Optional, Dict, Any
 Test Search Ingredients Functionality
 '''
 
+'''
+Make sure you have the required libraries installed:
+python -m pip install python-dotenv
+'''
 
 # Location ID for Oklahoma City, OK: 540FC253
 
 def main():
     
     ingredients: List[Ingredient] = []
-    ingredients = search_ingredients("oats", 10)
+    ingredients = search_ingredients("milk", 10)
     
     # Print ingredient descriptions
     print("Number of ingredients found: ", len(ingredients))

@@ -28,7 +28,8 @@ class Ingredient:
             "Ingredient Description:",
             self.name,
             self.product_ID,
-            f"Serving Size (g): {self.serving_size_g}",
+            f"Serving Size : {self.serving_size} {self.serving_size_unit}",
+            #f"Serving Size Description: ({self.serving_size_description})",
             f"----------------------------------------",
             f"Price Information:",
             f"Regular price {self.local_regular}",
@@ -50,7 +51,11 @@ class Ingredient:
     # Metadata
     product_ID: str = ""
     name: str = ""
-    serving_size_g: float = 100.0  # default per 100g
+    
+    # Seving size information
+    serving_size: float = 0 # default per 100g
+    #serving_size_description: str = ""
+    serving_size_unit: str = ""
     
     
     nutrients: List[nutrientInfo] = field(default_factory=list) #Empty List of nutrientInfo objects
