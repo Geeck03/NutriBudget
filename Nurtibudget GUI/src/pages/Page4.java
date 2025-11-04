@@ -76,7 +76,7 @@ public class Page4 extends JPanel {
         favoritesButton.addActionListener(e -> showFavorites());
 
         JButton addButton = new JButton("+ Add Recipe");
-        addButton.addActionListener(e -> openAddRecipeDialog());
+        addButton.addActionListener(e -> openAddRecipeDialog(null));
 
         topPanel.add(new JLabel("Search:"));
         topPanel.add(searchField);
@@ -165,7 +165,7 @@ public class Page4 extends JPanel {
     }
 
     //==============================================================================================================
-    // Sidebar
+    // Sidebar / Edit Recipe
     //==============================================================================================================
     private void showSidebar(Recipe r) {
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), r.name, true);
@@ -193,6 +193,12 @@ public class Page4 extends JPanel {
         descArea.setBackground(new Color(250, 250, 250));
         descArea.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
+        JButton editButton = new JButton("Edit Recipe");
+        editButton.addActionListener(e -> {
+            dialog.dispose();
+            openAddRecipeDialog(r);
+        });
+
         JButton deleteButton = new JButton("Delete Recipe");
         deleteButton.addActionListener(e -> {
             int confirm = JOptionPane.showConfirmDialog(dialog, "Are you sure you want to delete this recipe?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
@@ -213,30 +219,32 @@ public class Page4 extends JPanel {
         dialog.add(Box.createVerticalStrut(10));
         dialog.add(new JScrollPane(descArea));
         dialog.add(Box.createVerticalStrut(10));
+        dialog.add(editButton);
+        dialog.add(Box.createVerticalStrut(5));
         dialog.add(deleteButton);
 
         dialog.setVisible(true);
     }
 
     //==============================================================================================================
-    // Add Recipe Dialog
+    // Add / Edit Recipe Dialog
     //==============================================================================================================
-    private void openAddRecipeDialog() {
-        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Add Recipe", true);
+    private void openAddRecipeDialog(Recipe existing) {
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), existing == null ? "Add Recipe" : "Edit Recipe", true);
         dialog.setSize(400, 500);
         dialog.setLocationRelativeTo(this);
         dialog.setLayout(new BoxLayout(dialog.getContentPane(), BoxLayout.Y_AXIS));
 
-        JTextField nameField = new JTextField();
-        JTextField costField = new JTextField();
-        JTextField caloriesField = new JTextField();
-        JTextField proteinField = new JTextField();
-        JTextField carbsField = new JTextField();
-        JTextField fatField = new JTextField();
-        JTextArea descArea = new JTextArea(5, 20);
+        JTextField nameField = new JTextField(existing != null ? existing.name : "");
+        JTextField costField = new JTextField(existing != null ? String.valueOf(existing.cost) : "");
+        JTextField caloriesField = new JTextField(existing != null ? String.valueOf(existing.calories) : "");
+        JTextField proteinField = new JTextField(existing != null ? String.valueOf(existing.protein) : "");
+        JTextField carbsField = new JTextField(existing != null ? String.valueOf(existing.carbs) : "");
+        JTextField fatField = new JTextField(existing != null ? String.valueOf(existing.fat) : "");
+        JTextArea descArea = new JTextArea(existing != null ? existing.description : "", 5, 20);
 
         JButton selectImageButton = new JButton("Select Image");
-        final String[] selectedImagePath = {null};
+        final String[] selectedImagePath = {existing != null ? existing.imagePath : null};
         selectImageButton.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
             chooser.setFileFilter(new FileNameExtensionFilter("Image files", "jpg", "jpeg", "png", "gif"));
@@ -259,19 +267,32 @@ public class Page4 extends JPanel {
 
         JButton saveButton = new JButton("Save");
         saveButton.addActionListener(e -> {
-            int nextId = recipes.stream().mapToInt(r -> r.id).max().orElse(0) + 1;
-            Recipe r = new Recipe(
-                    nextId,
-                    nameField.getText(),
-                    safeParseDouble(costField.getText()),
-                    safeParseInt(caloriesField.getText()),
-                    safeParseInt(proteinField.getText()),
-                    safeParseInt(carbsField.getText()),
-                    safeParseDouble(fatField.getText()),
-                    descArea.getText(),
-                    selectedImagePath[0]
-            );
-            recipes.add(r);
+            if(existing != null){
+
+                existing.name = nameField.getText();
+                existing.cost = safeParseDouble(costField.getText());
+                existing.calories = safeParseInt(caloriesField.getText());
+                existing.protein = safeParseInt(proteinField.getText());
+                existing.carbs = safeParseInt(carbsField.getText());
+                existing.fat = safeParseDouble(fatField.getText());
+                existing.description = descArea.getText();
+                existing.imagePath = selectedImagePath[0];
+            } else {
+                // Adding new recipe
+                int nextId = recipes.stream().mapToInt(r -> r.id).max().orElse(0) + 1;
+                Recipe r = new Recipe(
+                        nextId,
+                        nameField.getText(),
+                        safeParseDouble(costField.getText()),
+                        safeParseInt(caloriesField.getText()),
+                        safeParseInt(proteinField.getText()),
+                        safeParseInt(carbsField.getText()),
+                        safeParseDouble(fatField.getText()),
+                        descArea.getText(),
+                        selectedImagePath[0]
+                );
+                recipes.add(r);
+            }
             saveRecipesToFile();
             refreshGrid();
             dialog.dispose();
@@ -300,7 +321,7 @@ public class Page4 extends JPanel {
             }
 
             java.nio.file.Files.copy(sourceFile.toPath(), destFile.toPath());
-            return destFile.getAbsolutePath(); // ✅ Use absolute path
+            return destFile.getAbsolutePath();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Failed to copy image: " + e.getMessage());
             return null;
@@ -316,7 +337,7 @@ public class Page4 extends JPanel {
         if (!f.exists()) return list;
 
         try (BufferedReader br = new BufferedReader(new FileReader(f))) {
-            String line = br.readLine(); // skip header
+            String line = br.readLine();
             while ((line = br.readLine()) != null) {
                 if (line.trim().isEmpty()) continue;
                 String[] p = line.split("\t");
@@ -404,5 +425,61 @@ public class Page4 extends JPanel {
         Image img = icon.getImage();
         Image scaled = img.getScaledInstance(width, height, Image.SCALE_SMOOTH);
         return new ImageIcon(scaled);
+    }
+
+    //==============================================================================================================
+    // Public access helper for other pages (e.g., Calendar)
+    //==============================================================================================================
+    public static List<Recipe> loadRecipesFromFile(String filePath) {
+        Page4 tempPage = new Page4();
+        return tempPage.loadRecipes(filePath);
+    }
+
+    public static List<Recipe> loadRecipesFromFile(String filePath, boolean direct) {
+        List<Recipe> list = new ArrayList<>();
+        File f = new File(filePath);
+        if (!f.exists()) return list;
+
+        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+            br.readLine();
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.trim().isEmpty()) continue;
+                String[] p = line.split("\t");
+                if (p.length >= 7) {
+                    try {
+                        int id = Integer.parseInt(p[0]);
+                        String name = p[1];
+                        double cost = Double.parseDouble(p[2]);
+                        int calories = Integer.parseInt(p[3]);
+                        int protein = Integer.parseInt(p[4]);
+                        int carbs = Integer.parseInt(p[5]);
+                        double fat = Double.parseDouble(p[6]);
+                        String desc = p.length > 7 ? p[7] : "";
+                        String img = p.length > 8 ? p[8] : "";
+                        list.add(new Recipe(id, name, cost, calories, protein, carbs, fat, desc, img));
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    public static ImageIcon loadImageIconStatic(String path, int width, int height) {
+        if (path == null || path.isEmpty()) return null;
+        File f = new File(path);
+        if (!f.exists()) {
+            f = new File("src/pages/images/" + new File(path).getName());
+            if (!f.exists()) return null;
+        }
+        try {
+            ImageIcon icon = new ImageIcon(f.getAbsolutePath());
+            Image img = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+            return new ImageIcon(img);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
