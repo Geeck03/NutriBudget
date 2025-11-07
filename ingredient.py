@@ -21,6 +21,7 @@ class nutrientInfo:
     
     def describe(self) -> str:
         return f"{self.displayName}: Quantity: {self.quantity} {self.unitOfMeasure} ({self.percentDailyIntake}% DV)"
+
 @dataclass
 class Ingredient:    
     def describe(self) -> str:

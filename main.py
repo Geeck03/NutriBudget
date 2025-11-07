@@ -9,6 +9,7 @@ from accessToken import getAccessToken
 from locationCall import location_ID
 
 from typing import List, Optional, Dict, Any
+from scaleIngredient import scaleIngredient
 
 
 '''
@@ -26,12 +27,24 @@ def main():
     
     ingredients: List[Ingredient] = []
     ingredients = search_ingredients("milk", 10)
+
     
     # Print ingredient descriptions
-    print("Number of ingredients found: ", len(ingredients))
+    print("Number of ingredients found: \n", len(ingredients))
+    
+    # Regular Values 
+    print("Regular Value: ") 
     for i in range (len(ingredients)): 
         print("Ingredient ", i+1, ": ", ingredients[i].describe())
         print("\n")
         
+    
+    # Test of Scale Ingredient 
+    print("Scaled valued: ") 
+    for i in range (len(ingredients)): 
+        ing = scaleIngredient(ingredients[i], 0.5)
+        print("Ingredient ", i+1, ": ", ing.describe())
+        print("\n")
+    
 if __name__ == "__main__":
     main()
