@@ -139,7 +139,8 @@ class MySQLHandler:
 
             cursor.execute(query, values)
             self.connection.commit()
-            new_id = cursor.lastrowidprint(f"[SUCCESS] Inserted into '{table}' with ID {new_id}.")
+            new_id = cursor.lastrowid
+            print(f"[SUCCESS] Inserted into '{table}' with ID {new_id}.")
             return new_id
         except Error as e:
             print(f"[ERROR] Failed to insert into '{table}': {e}")
@@ -617,7 +618,7 @@ class MySQLHandler:
     def _safe_float(self, value):
         if value in (None, "", [], {}):
             return 0.0
-        if isinstance(value, int, float):
+        if isinstance(value, int):
             value = value 
             return value
         if isinstance(value, str) and value.startswith("$"):
