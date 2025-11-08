@@ -566,11 +566,11 @@ class MySQLHandler:
             ingredient_data = {
                 # Basic Data
                 "ingredient_name": data.get("name"),
-                "serving_size_g": float(data.get("serving_size", 100.0)),
+                "serving_size_g": self._safe_float(data.get("serving_size", 100.0)),
                 "promo": self._safe_float(data.get("local_promo")),
                 "promo_per_unit_estimate": self._safe_float(data.get("local_promo_per_unit_estimate")),
-                "national_price": float(data.get("national_regular", 0.0)),
-                "regular_per_unit_estimate": float(data.get("national_regular_per_unit_estimate", 0.0)),
+                "national_price": self._safe_float(data.get("national_regular", 0.0)),
+                "regular_per_unit_estimate": self._safe_float(data.get("national_regular_per_unit_estimate", 0.0)),
 
                 # Macronutrients
                 "calories": self._safe_float(self._get_nutrient(nutrients, "Calories")),
@@ -591,7 +591,7 @@ class MySQLHandler:
                 "magnesium": self._safe_float(self._get_nutrient(nutrients, "Magnesium")),
                 "cholesterol": self._safe_float(self._get_nutrient(nutrients, "Cholesterol")),
                 "saturated_fat": self._safe_float(self._get_nutrient(nutrients, "Saturated Fat")),
-                    "trans_fat": self._safe_float(self._get_nutrient(nutrients, "Trans Fat"))
+                "trans_fat": self._safe_float(self._get_nutrient(nutrients, "Trans Fat"))
             }
             
 
@@ -615,9 +615,15 @@ class MySQLHandler:
     
     # Helper: Safely convert to float
     def _safe_float(self, value):
+        if value in (None, "", [], {}):
+            return 0.0
+        if isinstance(value, int, float):
+            value = value 
+            return value
+        if isinstance(value, str) and value.startswith("$"):
+            value = value.replace("$", "")
+            return float(value)
         try:
-            if isinstance(value, str) and value.startswith("$"):
-                value = value.replace("$", "")
             return float(value)
         except (TypeError, ValueError):
             print(f"[ERROR] Failed to safely convert value to float.")
@@ -625,7 +631,7 @@ class MySQLHandler:
         
     # Helper: Extract a nutrient value by displayName
     def _get_nutrient(self, ingredient_data, nutrient_name):
-        for n in ingredient_data.get("nutrients", []):
+        for n in ingredient_data or []:
             if n.get("displayName", "").lower() == nutrient_name.lower():
                 return n.get("quantity", 0.0)
         return 0.0

@@ -274,17 +274,17 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
         
         # Local price block (dict or {})
         price = item.get("price", {}) or {} 
-        local_regular = price.get("regular")
-        local_regular_per_unit_estimate = price.get("regularPerUnitEstimate") 
-        local_promo = price.get("promo")
-        local_promo_per_unit_estimate = price.get("promoPerUnitEstimate")
+        local_regular = price.get("regular") or 0.0
+        local_regular_per_unit_estimate = price.get("regularPerUnitEstimate") or 0.0
+        local_promo = price.get("promo") or 0.0
+        local_promo_per_unit_estimate = price.get("promoPerUnitEstimate") or 0.0
 
         # National price block (dict or {})
         nprice = item.get("nationalPrice", {}) or {}
-        national_regular = nprice.get("regular")
-        national_promo = nprice.get("promo")
-        national_promo_per_unit_estimate = nprice.get("promoPerUnitEstimate")
-        national_regular_per_unit_estimate = nprice.get("regularPerUnitEstimate")
+        national_regular = nprice.get("regular") or 0.0
+        national_promo = nprice.get("promo") or 0.0
+        national_promo_per_unit_estimate = nprice.get("promoPerUnitEstimate") or 0.0
+        national_regular_per_unit_estimate = nprice.get("regularPerUnitEstimate") or 0.0
         
         
         ingredient = Ingredient(

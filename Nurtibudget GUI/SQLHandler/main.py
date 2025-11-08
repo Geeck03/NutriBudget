@@ -31,6 +31,7 @@ def main():
     
 
     print ("\n=== Connected to Database ===")
+    print("Attempt 2\n")
 
     # Insert sample ingredients
 
@@ -117,7 +118,7 @@ def main():
     print(f"Inserted Ingredient ID: {ingredient_id}")
 
     # Fetch data to verify
-
+    '''
     print(f"\n=== Fetching Recipes ===")
     recipes = db.fetch_all("SELECT * FROM Recipes")
     for r in recipes:
@@ -130,10 +131,10 @@ def main():
         JOIN Recipes R ON R.recipe_ID = RI.recipe_ID
         JOIN Ingredients I ON I.ingredient_ID = RI.ingredient_ID
         WHERE R.recipe_ID = %s
-    """, (recipe_id,))
+    """(recipe_id,))
     for li in linked_ingredients:
         print(f"• {li['ingredient_name']} ({li['quantity']} g/mL)")
-
+    '''
     # Close the connection
     db.close()
     print(f"\n=== Database Connection Closed ===")

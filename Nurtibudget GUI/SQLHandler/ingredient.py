@@ -55,7 +55,7 @@ class Ingredient:
     name: str = ""
     
     # Seving size information
-    serving_size: float = 0 # default per 100g
+    serving_size: float = 0.0 # default per 100g
     #serving_size_description: str = ""
     serving_size_unit: str = ""
     servings_per_container: float = 0.0
@@ -63,10 +63,10 @@ class Ingredient:
     nutrients: List[nutrientInfo] = field(default_factory=list) #Empty List of nutrientInfo objects
     
     # Price info for store
-    local_regular: str = ""
-    local_promo: str = ""
-    local_promo_per_unit_estimate: str = ""
-    local_regular_per_unit_estimate: str = ""
+    local_regular: float = 0.0
+    local_promo: float = 0.0
+    local_promo_per_unit_estimate: float = 0.0
+    local_regular_per_unit_estimate: float = 0.0
     
     # Can implement price per serving later
     # Price per serving is: servings_per_container / local_regular 
