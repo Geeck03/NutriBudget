@@ -62,19 +62,18 @@ public class Main {
     }
 
     //==================================================================================================================
-    // Navigation: Switch Between Login and Account Creation
+    // Switch Between Login and Account Creation
     //==================================================================================================================
     private void showAccountCreation() {
         cardLayout.show(mainPanel, "create");
     }
 
-    //--------------------------------------------------------------------------------------------------------------
     private void showLogin() {
         cardLayout.show(mainPanel, "login");
     }
 
     //==================================================================================================================
-    // Main Application (Post-Login)
+    // Main Application
     //==================================================================================================================
     private void mainApp() {
         Dimension prevSize = frame.getSize();
@@ -111,7 +110,7 @@ public class Main {
         buttonPanel.setBorder(BorderFactory.createEmptyBorder(20, 10, 20, 10));
 
         //--------------------------------------------------------------------------------------------------------------
-        // Main Content (Card Layout for Pages)
+        // Card Layout for Pages
         //--------------------------------------------------------------------------------------------------------------
         CardLayout cardLayout = new CardLayout();
         JPanel cardPanel = new JPanel(cardLayout);
@@ -122,6 +121,7 @@ public class Main {
         cardPanel.add(new Page2(), "Page2");
         cardPanel.add(new Page3(), "Page3");
         cardPanel.add(new Page4(), "Page4");
+        cardPanel.add(new AccountInfoPage(), "AccountInfo");
 
         //--------------------------------------------------------------------------------------------------------------
         // Sidebar Buttons
@@ -140,6 +140,7 @@ public class Main {
             button.setBackground(DARK_GRAY);
             button.setOpaque(true);
             button.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
             JButton finalButton = button;
 
             // Hover Effects
@@ -163,6 +164,42 @@ public class Main {
         }
 
         //--------------------------------------------------------------------------------------------------------------
+        // Account Info Button
+        //--------------------------------------------------------------------------------------------------------------
+        buttonPanel.add(Box.createVerticalGlue()); // Push account button to bottom
+        JButton accountButton = pageButton("/pages/images/account_icon.png", 64, 64);
+
+        if (accountButton == null) {
+            accountButton = new JButton("Account");
+            accountButton.setForeground(WHITE);
+            accountButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        }
+
+        accountButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        accountButton.setBackground(DARK_GRAY);
+        accountButton.setOpaque(true);
+        accountButton.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JButton finalAccountButton = accountButton;
+
+        // Hover effect
+        accountButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                finalAccountButton.setBackground(OKSTATE_ORANGE);
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                finalAccountButton.setBackground(DARK_GRAY);
+            }
+        });
+
+        // Switch to account page
+        accountButton.addActionListener(e -> cardLayout.show(cardPanel, "AccountInfo"));
+        buttonPanel.add(accountButton);
+
+        //--------------------------------------------------------------------------------------------------------------
         // Final Frame Assembly
         //--------------------------------------------------------------------------------------------------------------
         frame.add(buttonPanel, BorderLayout.WEST);
@@ -181,7 +218,7 @@ public class Main {
     }
 
     //==================================================================================================================
-    // Utility: Create Sidebar Page Buttons
+    // Sidebar Page Buttons
     //==================================================================================================================
     private JButton pageButton(String resourcePath, int width, int height) {
         java.net.URL imgURL = getClass().getResource(resourcePath);
