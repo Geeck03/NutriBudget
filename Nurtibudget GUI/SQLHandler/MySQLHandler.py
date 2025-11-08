@@ -534,6 +534,8 @@ class MySQLHandler:
             if cursor:
                 cursor.close()
     
+    
+    
     def insert_ingredient_object(self, ingredient: Ingredient) -> Optional[int]:
         """
         Insert an ingredient dataclass object into the Ingredients table.
@@ -557,8 +559,8 @@ class MySQLHandler:
         try:
             data = asdict(ingredient)
 
-            # Remove fields that aren't part of the Ingredients tab;e
-            data.pop("nutrients", None)
+            # Remove fields that aren't part of the Ingredients table
+            nutrients = data.pop("nutrients", None)
 
             # Build the dictionary that matches the ingredients table
             ingredient_data = {
@@ -571,26 +573,27 @@ class MySQLHandler:
                 "regular_per_unit_estimate": float(data.get("national_regular_per_unit_estimate", 0.0)),
 
                 # Macronutrients
-                "calories": self._safe_float(self._get_nutrient(data, "Calories")),
-                "protein": self._safe_float(self._get_nutrient(data, "Protein")),
-                "carbs": self._safe_float(self._get_nutrient(data, "Carbohydrate")),
-                "fats": self._safe_float(self._get_nutrient(data, "Total Fat")),
-                "fiber": self._safe_float(self._get_nutrient(data, "Fiber")),
-                "sugars": self._safe_float(self._get_nutrient(data, "Sugar")),
+                "calories": self._safe_float(self._get_nutrient(nutrients, "Calories")),
+                "protein": self._safe_float(self._get_nutrient(nutrients, "Protein")),
+                "carbs": self._safe_float(self._get_nutrient(nutrients, "Carbohydrate")),
+                "fats": self._safe_float(self._get_nutrient(nutrients, "Total Fat")),
+                "fiber": self._safe_float(self._get_nutrient(nutrients, "Fiber")),
+                "sugars": self._safe_float(self._get_nutrient(nutrients, "Sugar")),
 
                 # Micronutrients
-                "vitamin_a": self._safe_float(self._get_nutrient(data, "Vitamin A")),
-                "vitamin_c": self._safe_float(self._get_nutrient(data, "Vitamin C")),
-                "vitamin_d": self._safe_float(self._get_nutrient(data, "Vitamin D")),
-                "calcium": self._safe_float(self._get_nutrient(data, "Calcium")),
-                "iron": self._safe_float(self._get_nutrient(data, "Iron")),
-                "potassium": self._safe_float(self._get_nutrient(data, "Potassium")),
-                "sodium": self._safe_float(self._get_nutrient(data, "Sodium")),
-                "magnesium": self._safe_float(self._get_nutrient(data, "Magnesium")),
-                "cholesterol": self._safe_float(self._get_nutrient(data, "Cholesterol")),
-                "saturated_fat": self._safe_float(self._get_nutrient(data, "Saturated Fat")),
-                "trans_fat": self._safe_float(self._get_nutrient(data, "Trans Fat"))
+                "vitamin_a": self._safe_float(self._get_nutrient(nutrients, "Vitamin A")),
+                "vitamin_c": self._safe_float(self._get_nutrient(nutrients, "Vitamin C")),
+                "vitamin_d": self._safe_float(self._get_nutrient(nutrients, "Vitamin D")),
+                "calcium": self._safe_float(self._get_nutrient(nutrients, "Calcium")),
+                "iron": self._safe_float(self._get_nutrient(nutrients, "Iron")),
+                "potassium": self._safe_float(self._get_nutrient(nutrients, "Potassium")),
+                "sodium": self._safe_float(self._get_nutrient(nutrients, "Sodium")),
+                "magnesium": self._safe_float(self._get_nutrient(nutrients, "Magnesium")),
+                "cholesterol": self._safe_float(self._get_nutrient(nutrients, "Cholesterol")),
+                "saturated_fat": self._safe_float(self._get_nutrient(nutrients, "Saturated Fat")),
+                    "trans_fat": self._safe_float(self._get_nutrient(nutrients, "Trans Fat"))
             }
+            
 
             # Remove any None or empty entries
             clean_data = {k: v for k, v in ingredient_data.items() if v not in (None, "", [])}
@@ -609,7 +612,7 @@ class MySQLHandler:
         finally:
             if cursor:
                 cursor.close()
-        
+    
     # Helper: Safely convert to float
     def _safe_float(self, value):
         try:

@@ -24,6 +24,10 @@ def main():
         password = "gE1lINQdeb",
         database ="sql3806244"
     )
+    
+    
+    # Hope's test
+    
 
     print ("\n=== Connected to Database ===")
 
