@@ -1,5 +1,6 @@
 from MySQLHandler import MySQLHandler
 from ingredient import Ingredient
+from app import search_ingredients
 
 def main():
     """
@@ -52,6 +53,7 @@ def main():
         "sugars": 5.0
     }
 
+    '''
     oats_id = db.insert_ingredients(oats)
     milk_id = db.insert_ingredients(milk)
 
@@ -104,8 +106,14 @@ def main():
             {"displayName": "Magnesium", "quantity": 177}
         ]
     )
+    '''
+    print("\n=== Inserting Ingredient Object ===")
+    
+    apples = search_ingredients("apple", 2)
+    apple = apples[0]
+    
 
-    ingredient_id = db.insert_ingredient_object(oats)
+    ingredient_id = db.insert_ingredient_object(apple)
     print(f"Inserted Ingredient ID: {ingredient_id}")
 
     # Fetch data to verify
