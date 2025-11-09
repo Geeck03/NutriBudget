@@ -221,7 +221,7 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
             serving_size_unit = serving_size_unit[0] if serving_size_unit else {}
         else:
             serving_size_unit = {} 
-        print(serving_size_unit)
+        # print(serving_size_unit)
         serving_size_name = serving_size_unit.get("abbreviation", "") or serving_size_unit.get("name", "") or "Unknown serving size unit"
             
         # Get list of nutrients    

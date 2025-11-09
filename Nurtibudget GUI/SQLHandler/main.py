@@ -110,7 +110,7 @@ def main():
     '''
     print("\n=== Inserting Ingredient Object ===")
     
-    apples = search_ingredients("apple", 2)
+    apples = search_ingredients("bread", 2)
     apple = apples[0]
     
 
