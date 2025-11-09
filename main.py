@@ -26,18 +26,19 @@ python -m pip install python-dotenv
 def main():
     
     ingredients: List[Ingredient] = []
-    ingredients = search_ingredients("milk", 10)
-
+    ingredients = search_ingredients("orange", 10)
+    ingredients2 = search_ingredients("apple", 10)
+    print(ingredients[0])
     
     # Print ingredient descriptions
     print("Number of ingredients found: \n", len(ingredients))
-    
+
     # Regular Values 
     print("Regular Value: ") 
     for i in range (len(ingredients)): 
         print("Ingredient ", i+1, ": ", ingredients[i].describe())
         print("\n")
-        
+    
     
     # Test of Scale Ingredient 
     print("Scaled valued: ") 
@@ -45,6 +46,6 @@ def main():
         ing = scaleIngredient(ingredients[i], 0.5)
         print("Ingredient ", i+1, ": ", ing.describe())
         print("\n")
-    
+
 if __name__ == "__main__":
     main()

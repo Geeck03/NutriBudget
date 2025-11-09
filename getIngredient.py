@@ -129,7 +129,7 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
             serving_size_unit = serving_size_unit[0] if serving_size_unit else {}
         else:
             serving_size_unit = {} 
-        print(serving_size_unit)
+        # print(serving_size_unit)
         serving_size_name = serving_size_unit.get("abbreviation", "") or serving_size_unit.get("name", "") or "Unknown serving size unit"
             
         # Get list of nutrients    
@@ -180,9 +180,25 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
         # Takes the first item/SKU
         items_list = product.get("items") or [] 
         item: Dict[str, Any] = items_list[0] if items_list else{} 
+        
+        '''
+        #allergens 
+        allergen = product.get("allergens") or [] 
+        
+        
+        if isinstance(allergen, dict): 
+            allergen = allergen
+        elif isinstance(allergen, str):
+            allergen = allergen[0] if allergen else {}
+        else:
+            allergen = {} 
+    
+        # print(allergen)
+        '''
     
         # Local price block (dict or {})
         price = item.get("price", {}) or {} 
+        # print(price)
         local_regular = price.get("regular")
         local_regular_per_unit_estimate = price.get("regularPerUnitEstimate") 
         local_promo = price.get("promo")
