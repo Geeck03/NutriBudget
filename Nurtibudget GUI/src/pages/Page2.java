@@ -4,14 +4,20 @@ import javax.swing.*;
 import javax.swing.Timer;
 import java.awt.*;
 import java.io.*;
+import java.net.URL;
+import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 
 import py4j.ClientServer;
 import py4j.Py4JNetworkException;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import bridge.IKrogerWrapper;
 
 //======================================================================================================================
-// Page2 - Ingredients & Recipes with Py4J integration (for py4j0.10.9.9.jar)
+// Page2 - Ingredients & Recipes with Py4J integration (Kroger API)
 //======================================================================================================================
 public class Page2 extends JPanel {
 
@@ -19,27 +25,16 @@ public class Page2 extends JPanel {
     // Ingredient class
     //==============================================================================================================
     public static class Ingredient {
-        public int id;
         public String name;
-        public double cost;
-        public int calories;
-        public int protein;
-        public int carbs;
-        public double fat;
-        public String description;
+        public String info;
         public String imagePath;
+        public List<String> nutrients;
 
-        public Ingredient(int id, String name, double cost, int calories, int protein, int carbs,
-                          double fat, String description, String imagePath) {
-            this.id = id;
+        public Ingredient(String name, String info, String imagePath) {
             this.name = name;
-            this.cost = cost;
-            this.calories = calories;
-            this.protein = protein;
-            this.carbs = carbs;
-            this.fat = fat;
-            this.description = description;
+            this.info = info;
             this.imagePath = imagePath;
+            this.nutrients = new ArrayList<>();
         }
     }
 
@@ -74,10 +69,10 @@ public class Page2 extends JPanel {
     //==============================================================================================================
     // Instance fields
     //==============================================================================================================
-    private final Set<Integer> favoriteIngredientIds = new HashSet<>();
+    private final Set<String> favoriteIngredientNames = new HashSet<>();
     private final Set<Integer> favoriteRecipeIds = new HashSet<>();
 
-    private final List<Ingredient> ingredients;
+    private List<Ingredient> ingredients;
     private final List<Recipe> recipes;
 
     private JPanel gridPanel;
@@ -94,30 +89,25 @@ public class Page2 extends JPanel {
     private final JButton allButton = new JButton("All");
     private final JButton favoritesButton = new JButton("Favorites");
     private final JTextField searchField = new JTextField(20);
-
     private final JTabbedPane mainTabs = new JTabbedPane();
 
-    private ClientServer pyGateway;
+    private ClientServer clientServer;
+    private IKrogerWrapper pythonEntry;
+
+    private final Path favoritesDir = Paths.get("src/pages/favorites");
 
     //==============================================================================================================
     // Constructor
     //==============================================================================================================
     public Page2() {
         setLayout(new BorderLayout());
+        try { Files.createDirectories(favoritesDir); } catch (IOException e) { e.printStackTrace(); }
 
-        // Connect to Python Py4J server
-        try {
-            pyGateway = new ClientServer(null);
-            System.out.println("✅ Connected to Python Py4J server on port 25333");
-        } catch (Py4JNetworkException e) {
-            System.err.println("❌ Could not connect to Python server: " + e.getMessage());
-        } catch (Exception e) {
-            System.err.println("⚠️ Failed to initialize Py4J ClientServer.");
-            e.printStackTrace();
-        }
+        initPythonConnection();
 
-        ingredients = loadIngredientsFromPython(""); // initial load
+        ingredients = loadIngredientsFromPython("");
         recipes = loadRecipes("text/recipes.txt");
+        loadSavedFavorites();
 
         buildUI();
 
@@ -128,7 +118,24 @@ public class Page2 extends JPanel {
     }
 
     //==============================================================================================================
-    // UI
+    // Initialize Python connection
+    //==============================================================================================================
+    private void initPythonConnection() {
+        try {
+            System.out.println("🔌 Connecting to Python on port 25333...");
+            clientServer = new ClientServer(null);
+            pythonEntry = (IKrogerWrapper) clientServer.getPythonServerEntryPoint(
+                    new Class[]{IKrogerWrapper.class}
+            );
+            System.out.println("✅ Connected to Python!");
+        } catch (Py4JNetworkException e) {
+            System.err.println("❌ Could not connect to Python server!");
+            e.printStackTrace();
+        }
+    }
+
+    //==============================================================================================================
+    // Build UI
     //==============================================================================================================
     private void buildUI() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
@@ -151,7 +158,8 @@ public class Page2 extends JPanel {
         });
         add(mainTabs, BorderLayout.SOUTH);
 
-        gridPanel = buildGridPanelForIngredients(ingredients);
+        gridPanel = new JPanel();
+        gridPanel.setBackground(Color.WHITE);
         scrollPane = new JScrollPane(gridPanel);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
 
@@ -166,7 +174,7 @@ public class Page2 extends JPanel {
     }
 
     //==============================================================================================================
-    // Grid
+    // Grid panels
     //==============================================================================================================
     private JPanel buildGridPanelForIngredients(List<Ingredient> items) {
         JPanel grid = new JPanel(new WrapLayout(FlowLayout.LEFT, 15, 15));
@@ -203,7 +211,7 @@ public class Page2 extends JPanel {
         return card;
     }
 
-    private JPanel baseCard(String nameText, String imagePath) {
+    private JPanel baseCard(String nameText, String imageUrl) {
         JPanel card = new JPanel();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBorder(BorderFactory.createCompoundBorder(
@@ -220,9 +228,19 @@ public class Page2 extends JPanel {
         image.setAlignmentX(Component.CENTER_ALIGNMENT);
         image.setPreferredSize(new Dimension(120, 90));
 
-        ImageIcon icon = loadImageIcon("images/" + imagePath, 120, 90);
-        if (icon != null) image.setIcon(icon);
-        else { image.setText("[No Image]"); image.setForeground(Color.GRAY); }
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            try {
+                ImageIcon icon = new ImageIcon(new URL(imageUrl));
+                Image scaled = icon.getImage().getScaledInstance(120, 90, Image.SCALE_SMOOTH);
+                image.setIcon(new ImageIcon(scaled));
+            } catch (Exception e) {
+                image.setText("[No Image]");
+                image.setForeground(Color.GRAY);
+            }
+        } else {
+            image.setText("[No Image]");
+            image.setForeground(Color.GRAY);
+        }
 
         card.add(image);
         card.add(Box.createVerticalStrut(8));
@@ -231,13 +249,14 @@ public class Page2 extends JPanel {
     }
 
     //==============================================================================================================
-    // Sidebar + Animation
+    // Sidebar
     //==============================================================================================================
     private void showSidebar(Ingredient ing) {
         sidebarPanel.removeAll();
         sidebarPanel.add(createSidebarContent(ing), BorderLayout.CENTER);
         animateSidebar(true);
     }
+
     private void showSidebar(Recipe r) {
         sidebarPanel.removeAll();
         sidebarPanel.add(createSidebarContent(r), BorderLayout.CENTER);
@@ -264,49 +283,70 @@ public class Page2 extends JPanel {
     }
 
     private JPanel createSidebarContent(Ingredient ing) {
-        return sidebarTemplate(ing.name, ing.imagePath,
-                String.format("<html>Cost: $%.2f<br>Calories: %d<br>Protein: %d<br>Carbs: %d<br>Fat: %.1f</html>",
-                        ing.cost, ing.calories, ing.protein, ing.carbs, ing.fat),
-                ing.description, ing.id, true);
-    }
-    private JPanel createSidebarContent(Recipe r) {
-        return sidebarTemplate(r.name, r.imagePath,
-                String.format("<html>Cost: $%.2f<br>Calories: %d<br>Protein: %d<br>Carbs: %d<br>Fat: %.1f</html>",
-                        r.cost, r.calories, r.protein, r.carbs, r.fat),
-                r.description, r.id, false);
+        return sidebarTemplate(ing.name, ing.imagePath, ing.info, ing.nutrients, ing.name, true);
     }
 
-    private JPanel sidebarTemplate(String name, String img, String info, String desc, int id, boolean ingredient) {
+    private JPanel createSidebarContent(Recipe r) {
+        return sidebarTemplate(r.name, r.imagePath, r.description, null, String.valueOf(r.id), false);
+    }
+
+    private JPanel sidebarTemplate(String name, String img, String info, List<String> nutrients, String idOrName, boolean ingredient) {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
+        panel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        panel.setAlignmentY(Component.CENTER_ALIGNMENT);
+
         JButton close = new JButton("✖");
         close.addActionListener(e -> animateSidebar(false));
 
-        JLabel nameLabel = new JLabel(name);
+        JLabel nameLabel = new JLabel(name, SwingConstants.CENTER);
         nameLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
-        ImageIcon icon = loadImageIcon("images/" + img, sidebarWidth - 80, 250);
-        JLabel imageLabel = new JLabel(icon);
+        nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel infoLabel = new JLabel(info);
-        JTextArea descArea = new JTextArea(desc == null ? "" : desc);
-        descArea.setWrapStyleWord(true); descArea.setLineWrap(true);
-        descArea.setEditable(false);
+        JLabel imageLabel = new JLabel();
+        imageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        if (img != null && !img.isEmpty()) {
+            try {
+                ImageIcon icon = new ImageIcon(new URL(img));
+                Image scaled = icon.getImage().getScaledInstance(sidebarWidth - 80, 250, Image.SCALE_SMOOTH);
+                imageLabel.setIcon(new ImageIcon(scaled));
+            } catch (Exception e) {
+                imageLabel.setText("[No Image]");
+            }
+        } else {
+            imageLabel.setText("[No Image]");
+        }
+
+        JTextArea infoArea = new JTextArea(info);
+        infoArea.setLineWrap(true);
+        infoArea.setWrapStyleWord(true);
+        infoArea.setEditable(false);
+
+        JTextArea nutrientArea = new JTextArea();
+        if (nutrients != null && !nutrients.isEmpty()) {
+            nutrientArea.setText(String.join("\n", nutrients));
+        }
+        nutrientArea.setEditable(false);
 
         JButton fav = new JButton(ingredient ?
-                (favoriteIngredientIds.contains(id) ? "★ Favorite" : "☆ Favorite")
-                : (favoriteRecipeIds.contains(id) ? "★ Favorite" : "☆ Favorite"));
+                (favoriteIngredientNames.contains(idOrName) ? "★ Favorite" : "☆ Favorite")
+                : (favoriteRecipeIds.contains(Integer.parseInt(idOrName)) ? "★ Favorite" : "☆ Favorite"));
         fav.addActionListener(e -> {
-            if (ingredient) toggleFavoriteIngredient(id, fav);
-            else toggleFavoriteRecipe(id, fav);
+            if (ingredient) toggleFavoriteIngredient(idOrName, fav);
+            else toggleFavoriteRecipe(Integer.parseInt(idOrName), fav);
         });
 
         panel.add(close);
+        panel.add(Box.createVerticalStrut(10));
         panel.add(nameLabel);
+        panel.add(Box.createVerticalStrut(10));
         panel.add(imageLabel);
-        panel.add(infoLabel);
-        panel.add(new JScrollPane(descArea));
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(new JScrollPane(infoArea));
+        if (ingredient) panel.add(new JScrollPane(nutrientArea));
+        panel.add(Box.createVerticalStrut(10));
         panel.add(fav);
         return panel;
     }
@@ -314,11 +354,18 @@ public class Page2 extends JPanel {
     //==============================================================================================================
     // Favorites / Filtering
     //==============================================================================================================
-    private void toggleFavoriteIngredient(int id, JButton b) {
-        if (favoriteIngredientIds.remove(id)) b.setText("☆ Favorite");
-        else { favoriteIngredientIds.add(id); b.setText("★ Favorite"); }
+    private void toggleFavoriteIngredient(String name, JButton b) {
+        if (favoriteIngredientNames.remove(name)) {
+            b.setText("☆ Favorite");
+            removeFavoriteFile(name);
+        } else {
+            favoriteIngredientNames.add(name);
+            b.setText("★ Favorite");
+            saveFavoriteFile(name);
+        }
         refreshGrid();
     }
+
     private void toggleFavoriteRecipe(int id, JButton b) {
         if (favoriteRecipeIds.remove(id)) b.setText("☆ Favorite");
         else { favoriteRecipeIds.add(id); b.setText("★ Favorite"); }
@@ -329,17 +376,40 @@ public class Page2 extends JPanel {
     private void showAll() { showingFavorites = false; refreshGrid(); }
 
     private void refreshGrid() {
-        if (showingIngredients) {
-            List<Ingredient> list = showingFavorites ?
-                    ingredients.stream().filter(i -> favoriteIngredientIds.contains(i.id)).toList() : ingredients;
-            gridPanel = buildGridPanelForIngredients(list);
-        } else {
-            List<Recipe> list = showingFavorites ?
-                    recipes.stream().filter(r -> favoriteRecipeIds.contains(r.id)).toList() : recipes;
-            gridPanel = buildGridPanelForRecipes(list);
-        }
-        scrollPane.setViewportView(gridPanel);
-        revalidate(); repaint();
+        gridPanel.removeAll();
+
+        // Show loading
+        gridPanel.setLayout(new BorderLayout());
+        JLabel loading = new JLabel("Loading...", SwingConstants.CENTER);
+        loading.setFont(new Font("SansSerif", Font.BOLD, 24));
+        gridPanel.add(loading, BorderLayout.CENTER);
+        gridPanel.revalidate();
+        gridPanel.repaint();
+
+        SwingUtilities.invokeLater(() -> {
+            List<Ingredient> list;
+            String query = searchField.getText().trim();
+
+            if (showingIngredients) {
+                if (query.isEmpty() && showingFavorites) {
+                    list = loadSavedFavorites();
+                } else {
+                    list = showingFavorites ?
+                            ingredients.stream().filter(i -> favoriteIngredientNames.contains(i.name)).toList()
+                            : loadIngredientsFromPython(query);
+                }
+                gridPanel = buildGridPanelForIngredients(list);
+            } else {
+                List<Recipe> listR = showingFavorites ?
+                        recipes.stream().filter(r -> favoriteRecipeIds.contains(r.id)).toList()
+                        : recipes;
+                gridPanel = buildGridPanelForRecipes(listR);
+            }
+
+            scrollPane.setViewportView(gridPanel);
+            revalidate();
+            repaint();
+        });
     }
 
     private boolean matchesSearch(String name) {
@@ -348,31 +418,38 @@ public class Page2 extends JPanel {
     }
 
     //==============================================================================================================
-    // Data loading (Python + file)
+    // Data loading
     //==============================================================================================================
     private List<Ingredient> loadIngredientsFromPython(String query) {
         List<Ingredient> list = new ArrayList<>();
-        if (pyGateway == null) return list;
+        if (pythonEntry == null) return list;
+
         try {
-            Object wrapper = pyGateway.getPythonServerEntryPoint(new Class[]{});
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> results =
-                    (List<Map<String, Object>>) wrapper.getClass().getMethod("search", String.class, int.class)
-                            .invoke(wrapper, query, 20);
-            for (Map<String, Object> r : results) {
-                list.add(new Ingredient(
-                        Integer.parseInt(r.get("id").toString()),
-                        r.get("name").toString(),
-                        Double.parseDouble(r.get("price").toString()),
-                        Integer.parseInt(r.get("calories").toString()),
-                        Integer.parseInt(r.get("protein").toString()),
-                        Integer.parseInt(r.get("carbs").toString()),
-                        Double.parseDouble(r.get("fat").toString()),
-                        r.get("description").toString(),
-                        ""
-                ));
+            String jsonString = pythonEntry.search(query, 10);
+            JSONArray array = new JSONArray(jsonString);
+
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject obj = array.getJSONObject(i);
+
+                Ingredient ing = new Ingredient(
+                        obj.optString("name", "Unknown"),
+                        obj.optString("info", obj.optString("describe", "")),
+                        obj.optString("image_url", "")
+                );
+
+                JSONArray nutArray = obj.optJSONArray("nutrients");
+                if (nutArray != null) {
+                    for (int j = 0; j < nutArray.length(); j++)
+                        ing.nutrients.add(nutArray.getString(j));
+                }
+
+                list.add(ing);
             }
-        } catch (Exception e) { e.printStackTrace(); }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         return list;
     }
 
@@ -396,11 +473,49 @@ public class Page2 extends JPanel {
         return list;
     }
 
-    private ImageIcon loadImageIcon(String path, int w, int h) {
+    //==============================================================================================================
+    // Favorite file handling
+    //==============================================================================================================
+    private void saveFavoriteFile(String name) {
         try {
-            ImageIcon icon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/" + path)));
-            Image scaled = icon.getImage().getScaledInstance(w, h, Image.SCALE_SMOOTH);
-            return new ImageIcon(scaled);
-        } catch (Exception e) { return null; }
+            Path file = favoritesDir.resolve(name + ".json");
+            JSONObject obj = new JSONObject();
+            obj.put("name", name);
+            for (Ingredient ing : ingredients) {
+                if (ing.name.equals(name)) {
+                    obj.put("info", ing.info);
+                    obj.put("image", ing.imagePath);
+                    obj.put("nutrients", ing.nutrients);
+                }
+            }
+            Files.write(file, obj.toString().getBytes());
+        } catch (IOException e) { e.printStackTrace(); }
+    }
+
+    private void removeFavoriteFile(String name) {
+        try { Files.deleteIfExists(favoritesDir.resolve(name + ".json")); }
+        catch (IOException e) { e.printStackTrace(); }
+    }
+
+    private List<Ingredient> loadSavedFavorites() {
+        List<Ingredient> list = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(favoritesDir, "*.json")) {
+            for (Path path : stream) {
+                String content = Files.readString(path);
+                JSONObject obj = new JSONObject(content);
+                Ingredient ing = new Ingredient(
+                        obj.optString("name"),
+                        obj.optString("info"),
+                        obj.optString("image")
+                );
+                JSONArray nutArray = obj.optJSONArray("nutrients");
+                if (nutArray != null) {
+                    for (int j = 0; j < nutArray.length(); j++) ing.nutrients.add(nutArray.getString(j));
+                }
+                list.add(ing);
+                favoriteIngredientNames.add(ing.name);
+            }
+        } catch (IOException e) { e.printStackTrace(); }
+        return list;
     }
 }
