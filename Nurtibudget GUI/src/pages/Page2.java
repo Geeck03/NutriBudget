@@ -21,11 +21,18 @@ public class Page2 extends JPanel {
         public String name;
         public double cost;
         public int calories;
-        public int protein;
-        public int carbs;
+        public double protein;
+        public double carbs;
         public double fat;
         public String description;
         public String imagePath;
+        public String nutriGrade;
+
+        public double vitaminA, vitaminB1, vitaminB2, vitaminB3, vitaminB5, vitaminB6, vitaminB7,
+                    vitaminB9, vitaminB12, vitaminC, vitaminD, vitaminE, vitaminK;
+        public double calcium, phosphorus, magnesium, sodium, potassium, chloride, sulfur,
+                    iron, zinc, copper, manganese, iodine, selenium, molybdenum, chromium,
+                    fluoride, cobalt, fiber;
 
         public Ingredient(int id, String name, double cost, int calories, int protein, int carbs, double fat, String description, String imagePath) {
             this.id = id;
@@ -48,13 +55,19 @@ public class Page2 extends JPanel {
         public String name;
         public double cost;
         public int calories;
-        public int protein;
-        public int carbs;
+        public double protein;
+        public double carbs;
         public double fat;
         public String description;
         public String imagePath;
-        List<Ingredient> ingredients;
-    List<Recipe> recipes;
+        public String nutriGrade;
+
+
+        public double vitaminA, vitaminB1, vitaminB2, vitaminB3, vitaminB5, vitaminB6, vitaminB7,
+                    vitaminB9, vitaminB12, vitaminC, vitaminD, vitaminE, vitaminK;
+        public double calcium, phosphorus, magnesium, sodium, potassium, chloride, sulfur,
+                    iron, zinc, copper, manganese, iodine, selenium, molybdenum, chromium,
+                    fluoride, cobalt, fiber;
 
 
         public Recipe(int id, String name, double cost, int calories, int protein, int carbs, double fat, String description, String imagePath) {
@@ -76,13 +89,18 @@ public class Page2 extends JPanel {
     private final Set<Integer> favoriteIngredientIds = new HashSet<>();
     private final Set<Integer> favoriteRecipeIds = new HashSet<>();
     private final JComboBox<String> filterDropdown = new JComboBox<>(new String[] {
-        "All", "A+", "A", "B", "C", "D", "E"
+        "All", "A", "B", "C", "D", "E"
     });
 
 
 
     private final List<Ingredient> ingredients;
     private final List<Recipe> recipes;
+    // Dietary filters
+    private boolean filterVegetarian = false;
+    private boolean filterVegan = false;
+    private boolean filterGlutenFree = false;
+    
 
     private JPanel gridPanel;
     private JScrollPane scrollPane;
@@ -107,8 +125,10 @@ public class Page2 extends JPanel {
     //==============================================================================================================
     public Page2() {
         setLayout(new BorderLayout());
-        ingredients = loadIngredients("text/ingredients.txt");
-        recipes = loadRecipes("text/recipes.txt");
+        ingredients = ingredientLoader.loadIngredients("text/ingredients.txt");
+        recipes = recipeLoader.loadRecipes("text/recipes.txt");
+
+
         buildUI();
 
         SwingUtilities.invokeLater(() -> {
@@ -187,6 +207,46 @@ public class Page2 extends JPanel {
         filterDropdown.setPreferredSize(new Dimension(120, 28));
         filterDropdown.addActionListener(e -> refreshGrid()); // dynamically refresh on selection
         topPanel.add(filterDropdown);
+
+        // Dietary filter dropdown (as a popup menu)
+        JButton dietFilterButton = new JButton("Dietary Restrictions ▼");
+
+        JPopupMenu dietMenu = new JPopupMenu();
+
+        // Create checkbox menu items
+        JCheckBoxMenuItem vegetarianItem = new JCheckBoxMenuItem("Vegetarian");
+        JCheckBoxMenuItem veganItem = new JCheckBoxMenuItem("Vegan");
+        JCheckBoxMenuItem glutenFreeItem = new JCheckBoxMenuItem("Gluten-Free");
+
+        // Add listeners to each filter option
+        vegetarianItem.addActionListener(e -> {
+            filterVegetarian = vegetarianItem.isSelected();
+            refreshGrid();
+        });
+
+        veganItem.addActionListener(e -> {
+            filterVegan = veganItem.isSelected();
+            refreshGrid();
+        });
+
+        glutenFreeItem.addActionListener(e -> {
+            filterGlutenFree = glutenFreeItem.isSelected();
+            refreshGrid();
+        });
+
+        // Add them to the popup menu
+        dietMenu.add(vegetarianItem);
+        dietMenu.add(veganItem);
+        dietMenu.add(glutenFreeItem);
+
+        // Show menu when button is clicked
+        dietFilterButton.addActionListener(e ->
+            dietMenu.show(dietFilterButton, 0, dietFilterButton.getHeight())
+        );
+
+        // Add to top panel
+        topPanel.add(dietFilterButton);
+
     }
 
     //==============================================================================================================
@@ -469,6 +529,32 @@ public class Page2 extends JPanel {
                     ? ingredients.stream().filter(i -> favoriteIngredientIds.contains(i.id)).toList()
                     : new ArrayList<>(ingredients);
 
+            String selectedGrade = (String) filterDropdown.getSelectedItem();
+            if (!"All".equals(selectedGrade)) {
+                list = list.stream()
+                        .filter(i -> selectedGrade.equalsIgnoreCase(i.nutriGrade))
+                        .collect(Collectors.toList());
+            }
+
+            // Apply dietary filters
+            if (filterVegetarian) {
+                list = list.stream()
+                        .filter(i -> i.description != null && i.description.toLowerCase().contains("vegetarian"))
+                        .collect(Collectors.toList());
+            }
+
+            if (filterVegan) {
+                list = list.stream()
+                        .filter(i -> i.description != null && i.description.toLowerCase().contains("vegan"))
+                        .collect(Collectors.toList());
+            }
+
+            if (filterGlutenFree) {
+                list = list.stream()
+                        .filter(i -> i.description != null && i.description.toLowerCase().contains("gluten-free"))
+                        .collect(Collectors.toList());
+            }
+
             if (!query.isEmpty()) {
                 // Convert Ingredient objects to strings for searching
                 List<String> names = list.stream().map(i -> i.name).toList();
@@ -487,6 +573,14 @@ public class Page2 extends JPanel {
             List<Recipe> list = showingFavorites
                     ? recipes.stream().filter(r -> favoriteRecipeIds.contains(r.id)).toList()
                     : new ArrayList<>(recipes);
+
+            String selectedGrade = (String) filterDropdown.getSelectedItem();
+            if (!"All".equals(selectedGrade)) {
+                list = list.stream()
+                        .filter(r -> selectedGrade.equalsIgnoreCase(r.nutriGrade))
+                        .collect(Collectors.toList());
+            }
+
 
             if (!query.isEmpty()) {
                 List<String> names = list.stream().map(r -> r.name).toList();
@@ -509,61 +603,7 @@ public class Page2 extends JPanel {
     //==============================================================================================================
     // File loading (from src/pages/text/)
     //==============================================================================================================
-    private List<Ingredient> loadIngredients(String filePath) {
-        List<Ingredient> list = new ArrayList<>();
-        try (InputStream in = getClass().getResourceAsStream(filePath);
-             BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
-            String line = br.readLine();
-            while ((line = br.readLine()) != null) {
-                if (line.trim().isEmpty()) continue;
-                String[] p = line.split("\t");
-                if (p.length >= 7) {
-                    int id = safeParseInt(p[0]);
-                    String name = p[1];
-                    double cost = safeParseDouble(p[2]);
-                    int calories = safeParseInt(p[3]);
-                    int protein = safeParseInt(p[4]);
-                    int carbs = safeParseInt(p[5]);
-                    double fat = safeParseDouble(p[6]);
-                    String desc = p.length > 7 ? p[7] : "";
-                    String img = p.length > 8 ? p[8] : "";
-                    list.add(new Ingredient(id, name, cost, calories, protein, carbs, fat, desc, img));
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error loading ingredients from: " + filePath);
-            e.printStackTrace();
-        }
-        return list;
-    }
 
-    private List<Recipe> loadRecipes(String filePath) {
-        List<Recipe> list = new ArrayList<>();
-        try (InputStream in = getClass().getResourceAsStream(filePath);
-             BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
-            String line = br.readLine();
-            while ((line = br.readLine()) != null) {
-                if (line.trim().isEmpty()) continue;
-                String[] p = line.split("\t");
-                if (p.length >= 7) {
-                    int id = safeParseInt(p[0]);
-                    String name = p[1];
-                    double cost = safeParseDouble(p[2]);
-                    int calories = safeParseInt(p[3]);
-                    int protein = safeParseInt(p[4]);
-                    int carbs = safeParseInt(p[5]);
-                    double fat = safeParseDouble(p[6]);
-                    String desc = p.length > 7 ? p[7] : "";
-                    String img = p.length > 8 ? p[8] : "";
-                    list.add(new Recipe(id, name, cost, calories, protein, carbs, fat, desc, img));
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error loading recipes from: " + filePath);
-            e.printStackTrace();
-        }
-        return list;
-    }
 
     private double safeParseDouble(String s) {
         try {

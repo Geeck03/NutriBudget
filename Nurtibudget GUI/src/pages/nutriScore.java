@@ -1,44 +1,33 @@
 package pages;
 
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
-import pages.Page2.Ingredient;
-
 
 public class nutriScore {
 
-    public static int scoreNutrientBalance(double value, double rdi, double ul, int maxScore) {
-        if (value < 0) return -maxScore;
-
-        if (value >= rdi && value <= ul) return maxScore;
-
-        if (value < rdi) {
-            double percent = value / rdi;
-            if (percent >= 0.8) return 0;
-            else if (percent >= 0.6) return -1;
-            else if (percent >= 0.4) return -2;
-            else if (percent >= 0.2) return -3;
-            else return -5;
-        } else { // value > UL
-            double percentExcess = (value - ul) / ul;
-            if (percentExcess < 0.1) return 0;
-            else if (percentExcess < 0.25) return -1;
-            else if (percentExcess < 0.5) return -3;
-            else return -5;
-        }
+    // Compute points for a nutrient (beneficial only)
+    public static int scoreNutrient(double value, double rdi, double ul) {
+        if (value <= 0) return 0;
+        double percentOfRDI = value / rdi;
+        if (percentOfRDI >= 1) return 5;
+        if (percentOfRDI >= 0.8) return 4;
+        if (percentOfRDI >= 0.6) return 3;
+        if (percentOfRDI >= 0.4) return 2;
+        if (percentOfRDI >= 0.2) return 1;
+        return 0;
     }
 
+    // Map total points to NutriScore grade
     public static String gradeFromScore(int score) {
-        if (score >= 200) return "A+";
-        else if (score >= 150) return "A";
-        else if (score >= 100) return "B";
-        else if (score >= 50) return "C";
-        else if (score >= 0) return "D";
+        if (score >= 50) return "A";
+        else if (score >= 35) return "B";
+        else if (score >= 20) return "C";
+        else if (score >= 10) return "D";
         else return "E";
     }
 
-    public static Map<String, Object> calculateComprehensiveScore(Ingredient ingredient) {
+    // Calculate NutriScore for an Ingredient or Recipe
+    public static Map<String, Object> calculateComprehensiveScore(Object item) {
         int totalScore = 0;
         Map<String, Map<String, Object>> details = new HashMap<>();
 
@@ -49,13 +38,17 @@ public class nutriScore {
 
             double value;
             try {
-                Method getter = Ingredient.class.getMethod("get" + capitalize(nutrient));
-                value = (double) getter.invoke(ingredient);
+                var field = item.getClass().getDeclaredField(nutrient); // <— use item.getClass()
+                field.setAccessible(true);
+                value = (double) field.get(item);
             } catch (Exception e) {
                 value = 0.0;
+                System.out.println("Missing nutrient " + nutrient + " in class " + item.getClass().getName());
             }
 
-            int score = scoreNutrientBalance(value, rdi, ul, 5);
+                
+
+            int score = scoreNutrient(value, rdi, ul);
             totalScore += score;
 
             Map<String, Object> nutrientDetails = new HashMap<>();
