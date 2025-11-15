@@ -121,10 +121,14 @@ public class Main {
         cardPanel.add(new Page2(), "Page2");
         cardPanel.add(new Page3(), "Page3");
         cardPanel.add(new Page4(), "Page4");
+
+
+        cardPanel.add(new SuggestionsPage(), "Suggestions");
+
         cardPanel.add(new AccountInfoPage(), "AccountInfo");
 
         //--------------------------------------------------------------------------------------------------------------
-        // Sidebar Buttons
+        // Sidebar Buttons (Pages 1–4)
         //--------------------------------------------------------------------------------------------------------------
         for (int i = 1; i <= 4; i++) {
             int pageNum = i;
@@ -143,7 +147,6 @@ public class Main {
 
             JButton finalButton = button;
 
-            // Hover Effects
             button.addMouseListener(new java.awt.event.MouseAdapter() {
                 @Override
                 public void mouseEntered(java.awt.event.MouseEvent e) {
@@ -156,7 +159,6 @@ public class Main {
                 }
             });
 
-            // Button Navigation
             button.addActionListener(e -> cardLayout.show(cardPanel, "Page" + pageNum));
 
             buttonPanel.add(Box.createRigidArea(new Dimension(0, 15)));
@@ -164,9 +166,43 @@ public class Main {
         }
 
         //--------------------------------------------------------------------------------------------------------------
-        // Account Info Button
+        // Suggestions Button
         //--------------------------------------------------------------------------------------------------------------
-        buttonPanel.add(Box.createVerticalGlue()); // Push account button to bottom
+        JButton suggestionsButton = pageButton("/pages/images/icon5.png", 64, 64);
+
+        if (suggestionsButton == null) {
+            suggestionsButton = new JButton("Suggestions");
+            suggestionsButton.setForeground(WHITE);
+            suggestionsButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        }
+
+        suggestionsButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        suggestionsButton.setBackground(DARK_GRAY);
+        suggestionsButton.setOpaque(true);
+        suggestionsButton.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JButton finalSuggestionsButton = suggestionsButton;
+
+        suggestionsButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                finalSuggestionsButton.setBackground(OKSTATE_ORANGE);
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                finalSuggestionsButton.setBackground(DARK_GRAY);
+            }
+        });
+
+        suggestionsButton.addActionListener(e -> cardLayout.show(cardPanel, "Suggestions"));
+        buttonPanel.add(Box.createRigidArea(new Dimension(0, 15)));
+        buttonPanel.add(suggestionsButton);
+
+        //--------------------------------------------------------------------------------------------------------------
+        // Account Info Button (bottom)
+        //--------------------------------------------------------------------------------------------------------------
+        buttonPanel.add(Box.createVerticalGlue());
         JButton accountButton = pageButton("/pages/images/account_icon.png", 64, 64);
 
         if (accountButton == null) {
@@ -182,7 +218,6 @@ public class Main {
 
         JButton finalAccountButton = accountButton;
 
-        // Hover effect
         accountButton.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseEntered(java.awt.event.MouseEvent e) {
@@ -195,7 +230,6 @@ public class Main {
             }
         });
 
-        // Switch to account page
         accountButton.addActionListener(e -> cardLayout.show(cardPanel, "AccountInfo"));
         buttonPanel.add(accountButton);
 
