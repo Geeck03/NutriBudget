@@ -1,2 +1,1 @@
 id	name	cost	calories	protein	carbs	fat	description	imagePath
-1	grt	0.00	0	0	0	0.0		

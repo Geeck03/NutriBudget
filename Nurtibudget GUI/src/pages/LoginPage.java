@@ -4,9 +4,9 @@ import javax.swing.*;
 import java.awt.*;
 
 //==============================================================================================================
-// AccountCreationPage Class
+// LoginPage Class
 //==============================================================================================================
-public class AccountCreationPage extends JPanel {
+public class LoginPage extends JPanel {
 
     //==============================================================================================================
     // Color constants
@@ -19,7 +19,7 @@ public class AccountCreationPage extends JPanel {
     //==============================================================================================================
     // Constructor
     //==============================================================================================================
-    public AccountCreationPage(Runnable onAccountCreated, Runnable onBackToLogin) {
+    public LoginPage(Runnable onLoginSuccess, Runnable onCreateAccount) {
         setLayout(new GridBagLayout());
         setBackground(LIGHT_GRAY);
 
@@ -37,35 +37,32 @@ public class AccountCreationPage extends JPanel {
         //==========================================================================================================
         // Title
         //==========================================================================================================
-        JLabel title = new JLabel("Create Your Account");
+        JLabel title = new JLabel("Welcome to Nutribudget");
         title.setFont(new Font("Segoe UI", Font.BOLD, 22));
         title.setForeground(DARK_GRAY);
 
         //==========================================================================================================
         // Username Field
         //==========================================================================================================
-        JLabel newUsernameLabel = new JLabel("New Username:");
-        JTextField newUsernameField = new JTextField(15);
-        styleField(newUsernameField);
+        JLabel usernameLabel = new JLabel("Username:");
+        JTextField usernameField = new JTextField(15);
+        styleField(usernameField);
 
         //==========================================================================================================
         // Password Field
         //==========================================================================================================
-        JLabel newPasswordLabel = new JLabel("New Password:");
-        JPasswordField newPasswordField = new JPasswordField(15);
-        styleField(newPasswordField);
+        JLabel passwordLabel = new JLabel("Password:");
+        JPasswordField passwordField = new JPasswordField(15);
+        styleField(passwordField);
 
         //==========================================================================================================
         // Buttons
         //==========================================================================================================
-        JButton createAccountButton = styledButton("Create Account", OKSTATE_ORANGE, WHITE);
-        createAccountButton.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Account created!");
-            onAccountCreated.run();
-        });
+        JButton loginButton = styledButton("Login", OKSTATE_ORANGE, WHITE);
+        loginButton.addActionListener(e -> onLoginSuccess.run());
 
-        JButton backButton = styledButton("Back to Login", DARK_GRAY, WHITE);
-        backButton.addActionListener(e -> onBackToLogin.run());
+        JButton createAccountButton = styledButton("Create Account", DARK_GRAY, WHITE);
+        createAccountButton.addActionListener(e -> onCreateAccount.run());
 
         //==========================================================================================================
         // Layout inside card
@@ -76,23 +73,23 @@ public class AccountCreationPage extends JPanel {
 
         gbc.gridwidth = 1;
         gbc.gridy = 1; gbc.gridx = 0;
-        card.add(newUsernameLabel, gbc);
+        card.add(usernameLabel, gbc);
 
         gbc.gridx = 1;
-        card.add(newUsernameField, gbc);
+        card.add(usernameField, gbc);
 
         gbc.gridy = 2; gbc.gridx = 0;
-        card.add(newPasswordLabel, gbc);
+        card.add(passwordLabel, gbc);
 
         gbc.gridx = 1;
-        card.add(newPasswordField, gbc);
+        card.add(passwordField, gbc);
 
         gbc.gridy = 3; gbc.gridx = 0; gbc.gridwidth = 2;
         gbc.anchor = GridBagConstraints.CENTER;
-        card.add(createAccountButton, gbc);
+        card.add(loginButton, gbc);
 
         gbc.gridy = 4;
-        card.add(backButton, gbc);
+        card.add(createAccountButton, gbc);
 
         add(card);
     }

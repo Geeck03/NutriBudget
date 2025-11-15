@@ -10,5 +10,8 @@
     <orderEntry type="library" name="jfree.jfreechart" level="project" />
     <orderEntry type="library" name="jcalendar-1.4" level="project" />
     <orderEntry type="library" name="DateChooser" level="project" />
+    <orderEntry type="library" name="net.sf.py4j" level="project" />
+    <orderEntry type="library" name="py4j0.10.9.9" level="project" />
+    <orderEntry type="library" name="json-20250517" level="project" />
   </component>
 </module>

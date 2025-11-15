@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="lib">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/NutriBudget-main/Nurtibudget GUI/lib/jakarta.servlet-api-1.2.2.1-jre17.jar!/" />
+      <root url="jar://$PROJECT_DIR$/NutriBudget-main/Nurtibudget GUI/lib/jakarta.servlet-api-1.2.2.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/NutriBudget-main/Nurtibudget GUI/lib/jfreechart-1.2.2.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/NutriBudget-main/Nurtibudget GUI/lib/jfreechart-1.5.5.jar!/" />
+      <root url="jar://$PROJECT_DIR$/NutriBudget-main/Nurtibudget GUI/lib/jfreechart-1.2.2.1-jre17.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
