@@ -3,6 +3,64 @@ from ingredient import Ingredient
 from app import search_ingredients
 from dotenv import load_dotenv
 import os
+import threading
+import json
+from py4j.clientserver import ClientServer
+import time
+
+# ===================== KrogerWrapper (unchanged) =====================
+class KrogerWrapper:
+    def __init__(self):
+        print("✅ KrogerWrapper initialized using real Kroger API logic.")
+
+    def search(self, query, limit):
+        print(f"🔍 Python received: query='{query}', limit={limit}")
+
+        if not query.strip():
+            print("Empty search query received; returning empty list")
+            return json.dumps([])
+
+        try:
+            ingredients = search_ingredients(query, limit)
+            results = []
+
+            for ing in ingredients:
+                results.append({
+                    "id": ing.product_ID,
+                    "name": ing.name,
+                    "describe": getattr(ing, "description", "No description available"),
+                    "price": ing.local_regular if ing.local_regular else ing.national_regular,
+                    "promo_price": ing.local_promo if ing.local_promo else ing.national_promo,
+                    "image_url": getattr(ing, "image_url", ""),
+                    "nutrients": getattr(ing, "sidebar_nutrients", [
+                        f"Calories: {getattr(ing, 'calories', 'N/A')}",
+                        f"Protein: {getattr(ing, 'protein', 'N/A')}g",
+                        f"Carbs: {getattr(ing, 'carbs', 'N/A')}g",
+                        f"Fat: {getattr(ing, 'fat', 'N/A')}g",
+                    ])
+                })
+
+            return json.dumps(results, indent=2)
+
+        except Exception as e:
+            error_msg = f" Error in search(): {e}"
+            print(error_msg)
+            return json.dumps({"error": str(e)})
+
+# ===================== Py4J server setup =====================
+def start_py4j_server(ready_event):
+    wrapper = KrogerWrapper()
+    server = ClientServer(python_server_entry_point=wrapper)
+    print("✅ Python Py4J server running on default ports...")
+    ready_event.set()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Py4J Server stopped.")
+
+
+
 
 def main():
     """
@@ -149,5 +207,23 @@ def main():
     db.close()
     print(f"\n=== Database Connection Closed ===")
 
+
+
+
+
 if __name__ == "__main__":
+    py4j_ready = threading.Event()
+    py4j_thread = threading.Thread(target=start_py4j_server, args=(py4j_ready,), daemon=False)
+    py4j_thread.start()
+
+    py4j_ready.wait()
+    print("✅ Py4J server ready, running main()...")
+
     main()
+
+    # Keep Python alive for Java callbacks
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print(" Python process exiting")
