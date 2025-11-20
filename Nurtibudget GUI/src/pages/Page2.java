@@ -22,6 +22,15 @@ import bridge.IKrogerWrapper;
 public class Page2 extends JPanel {
 
     //==============================================================================================================
+    // Listener used when Page2 is used as an ingredient selector
+    //==============================================================================================================
+    public interface IngredientSelectionListener {
+        void ingredientSelected(JSONObject selection);
+    }
+
+    private IngredientSelectionListener selectionListener = null;
+
+    //==============================================================================================================
     // Ingredient class
     //==============================================================================================================
     public static class Ingredient {
@@ -71,10 +80,8 @@ public class Page2 extends JPanel {
     //==============================================================================================================
     private final Set<String> favoriteIngredientNames = new HashSet<>();
     private final Set<Integer> favoriteRecipeIds = new HashSet<>();
-
     private List<Ingredient> ingredients;
     private final List<Recipe> recipes;
-
     private JPanel gridPanel;
     private JScrollPane scrollPane;
     private JPanel sidebarPanel;
@@ -82,32 +89,48 @@ public class Page2 extends JPanel {
     private boolean sidebarVisible = false;
     private Timer sidebarTimer;
     private final int sidebarWidth = 480;
-
     private boolean showingFavorites = false;
     private boolean showingIngredients = true;
-
     private final JButton allButton = new JButton("All");
     private final JButton favoritesButton = new JButton("Favorites");
     private final JTextField searchField = new JTextField(20);
     private final JTabbedPane mainTabs = new JTabbedPane();
-
     private ClientServer clientServer;
     private IKrogerWrapper pythonEntry;
-
     private final Path favoritesDir = Paths.get("src/pages/favorites");
 
+    // static shared Py4J connection to avoid port conflict
+    private static ClientServer sharedClientServer = null;
+    private static IKrogerWrapper sharedPythonEntry = null;
+
     //==============================================================================================================
-    // Constructor
+    // Constructors
     //==============================================================================================================
-    public Page2() {
+    public Page2() { this(null, true); }
+
+    public Page2(IngredientSelectionListener listener) { this(listener, true); }
+
+    public Page2(IngredientSelectionListener listener, boolean connectPython) {
+        this.selectionListener = listener;
+
         setLayout(new BorderLayout());
         try { Files.createDirectories(favoritesDir); } catch (IOException e) { e.printStackTrace(); }
 
-        initPythonConnection();
+        if (connectPython) initPythonConnection();
 
-        ingredients = loadIngredientsFromPython("");
+        // -------------------------
+        // Fallback ingredients for mini page or offline
+        // -------------------------
+        ingredients = new ArrayList<>();
+        ingredients.add(new Ingredient("Tomato", "Fresh red tomato", ""));
+        ingredients.add(new Ingredient("Onion", "White onion", ""));
+        ingredients.add(new Ingredient("Chicken Breast", "Boneless, skinless", ""));
+        ingredients.add(new Ingredient("Garlic", "Fresh garlic cloves", ""));
+        ingredients.add(new Ingredient("Carrot", "Orange carrot", ""));
+
+
         recipes = loadRecipes("text/recipes.txt");
-        loadSavedFavorites();
+        if (connectPython) loadSavedFavorites();
 
         buildUI();
 
@@ -118,15 +141,24 @@ public class Page2 extends JPanel {
     }
 
     //==============================================================================================================
-    // Initialize Python connection
+    // Initialize Python connection safely
     //==============================================================================================================
     private void initPythonConnection() {
+        if (sharedClientServer != null && sharedPythonEntry != null) {
+            clientServer = sharedClientServer;
+            pythonEntry = sharedPythonEntry;
+            System.out.println("✅ Reusing existing Python connection!");
+            return;
+        }
+
         try {
             System.out.println("🔌 Connecting to Python on port 25333...");
-            clientServer = new ClientServer(null);
+            clientServer = new ClientServer(null); // default port
             pythonEntry = (IKrogerWrapper) clientServer.getPythonServerEntryPoint(
                     new Class[]{IKrogerWrapper.class}
             );
+            sharedClientServer = clientServer;
+            sharedPythonEntry = pythonEntry;
             System.out.println("✅ Connected to Python!");
         } catch (Py4JNetworkException e) {
             System.err.println("❌ Could not connect to Python server!");
@@ -312,22 +344,16 @@ public class Page2 extends JPanel {
                 ImageIcon icon = new ImageIcon(new URL(img));
                 Image scaled = icon.getImage().getScaledInstance(sidebarWidth - 80, 250, Image.SCALE_SMOOTH);
                 imageLabel.setIcon(new ImageIcon(scaled));
-            } catch (Exception e) {
-                imageLabel.setText("[No Image]");
-            }
-        } else {
-            imageLabel.setText("[No Image]");
-        }
+            } catch (Exception e) { imageLabel.setText("[No Image]"); }
+        } else imageLabel.setText("[No Image]");
 
-        JTextArea infoArea = new JTextArea(info);
+        JTextArea infoArea = new JTextArea(info != null ? info : "");
         infoArea.setLineWrap(true);
         infoArea.setWrapStyleWord(true);
         infoArea.setEditable(false);
 
         JTextArea nutrientArea = new JTextArea();
-        if (nutrients != null && !nutrients.isEmpty()) {
-            nutrientArea.setText(String.join("\n", nutrients));
-        }
+        if (nutrients != null && !nutrients.isEmpty()) nutrientArea.setText(String.join("\n", nutrients));
         nutrientArea.setEditable(false);
 
         JButton fav = new JButton(ingredient ?
@@ -347,6 +373,31 @@ public class Page2 extends JPanel {
         panel.add(new JScrollPane(infoArea));
         if (ingredient) panel.add(new JScrollPane(nutrientArea));
         panel.add(Box.createVerticalStrut(10));
+
+        if (ingredient && selectionListener != null) {
+            JButton addToRecipe = new JButton("Add to Recipe");
+            addToRecipe.addActionListener(e -> {
+                JPanel p = new JPanel(new GridLayout(2,2,6,6));
+                JTextField qtyField = new JTextField("0");
+                JComboBox<String> unitBox = new JComboBox<>(new String[]{"g","mg","kg","oz","lb","cup","tbsp","tsp","unit"});
+                p.add(new JLabel("Quantity:")); p.add(qtyField);
+                p.add(new JLabel("Unit:")); p.add(unitBox);
+                int res = JOptionPane.showConfirmDialog(this, p, "Enter quantity & unit", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+                if (res == JOptionPane.OK_OPTION) {
+                    String qtyS = qtyField.getText().trim();
+                    String unit = (String) unitBox.getSelectedItem();
+                    JSONObject out = new JSONObject();
+                    out.put("name", name);
+                    out.put("info", info != null ? info : "");
+                    out.put("imagePath", img != null ? img : "");
+                    out.put("quantity", qtyS);
+                    out.put("unit", unit != null ? unit : "");
+                    try { selectionListener.ingredientSelected(out); } catch (Exception ex) { ex.printStackTrace(); }
+                }
+            });
+            panel.add(addToRecipe);
+        }
+
         panel.add(fav);
         return panel;
     }
@@ -377,8 +428,6 @@ public class Page2 extends JPanel {
 
     private void refreshGrid() {
         gridPanel.removeAll();
-
-        // Show loading
         gridPanel.setLayout(new BorderLayout());
         JLabel loading = new JLabel("Loading...", SwingConstants.CENTER);
         loading.setFont(new Font("SansSerif", Font.BOLD, 24));
@@ -391,13 +440,10 @@ public class Page2 extends JPanel {
             String query = searchField.getText().trim();
 
             if (showingIngredients) {
-                if (query.isEmpty() && showingFavorites) {
-                    list = loadSavedFavorites();
-                } else {
-                    list = showingFavorites ?
-                            ingredients.stream().filter(i -> favoriteIngredientNames.contains(i.name)).toList()
-                            : loadIngredientsFromPython(query);
-                }
+                if (query.isEmpty() && showingFavorites) list = loadSavedFavorites();
+                else list = showingFavorites ?
+                        ingredients.stream().filter(i -> favoriteIngredientNames.contains(i.name)).toList()
+                        : loadIngredientsFromPython(query);
                 gridPanel = buildGridPanelForIngredients(list);
             } else {
                 List<Recipe> listR = showingFavorites ?
@@ -422,34 +468,25 @@ public class Page2 extends JPanel {
     //==============================================================================================================
     private List<Ingredient> loadIngredientsFromPython(String query) {
         List<Ingredient> list = new ArrayList<>();
-        if (pythonEntry == null) return list;
+        for (Ingredient ing : ingredients) if (ing.name.toLowerCase().contains(query.toLowerCase())) list.add(ing);
 
-        try {
-            String jsonString = pythonEntry.search(query, 10);
-            JSONArray array = new JSONArray(jsonString);
-
-            for (int i = 0; i < array.length(); i++) {
-                JSONObject obj = array.getJSONObject(i);
-
-                Ingredient ing = new Ingredient(
-                        obj.optString("name", "Unknown"),
-                        obj.optString("info", obj.optString("describe", "")),
-                        obj.optString("image_url", "")
-                );
-
-                JSONArray nutArray = obj.optJSONArray("nutrients");
-                if (nutArray != null) {
-                    for (int j = 0; j < nutArray.length(); j++)
-                        ing.nutrients.add(nutArray.getString(j));
+        if (pythonEntry != null) {
+            try {
+                String jsonString = pythonEntry.search(query, 10);
+                JSONArray array = new JSONArray(jsonString);
+                for (int i = 0; i < array.length(); i++) {
+                    JSONObject obj = array.getJSONObject(i);
+                    Ingredient ing = new Ingredient(
+                            obj.optString("name", "Unknown"),
+                            obj.optString("info", obj.optString("describe", "")),
+                            obj.optString("image_url", "")
+                    );
+                    JSONArray nutArray = obj.optJSONArray("nutrients");
+                    if (nutArray != null) for (int j = 0; j < nutArray.length(); j++) ing.nutrients.add(nutArray.getString(j));
+                    list.add(ing);
                 }
-
-                list.add(ing);
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
+            } catch (Exception e) { e.printStackTrace(); }
         }
-
         return list;
     }
 
@@ -509,9 +546,7 @@ public class Page2 extends JPanel {
                         obj.optString("image")
                 );
                 JSONArray nutArray = obj.optJSONArray("nutrients");
-                if (nutArray != null) {
-                    for (int j = 0; j < nutArray.length(); j++) ing.nutrients.add(nutArray.getString(j));
-                }
+                if (nutArray != null) for (int j = 0; j < nutArray.length(); j++) ing.nutrients.add(nutArray.getString(j));
                 list.add(ing);
                 favoriteIngredientNames.add(ing.name);
             }

@@ -9,12 +9,18 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
+import org.json.*;
+
+import java.util.Base64;
 
 //======================================================================================================================
 // Custom Calendar Panel
 //======================================================================================================================
 public class CustomCalendarPanel extends JPanel {
 
+    //==============================================================================================================
+    // Instance fields
+    //==============================================================================================================
     private JLabel monthYearLabel;
     private JPanel calendarPanel;
     private LocalDate currentDate;
@@ -22,14 +28,14 @@ public class CustomCalendarPanel extends JPanel {
     private static final String MEAL_PLAN_FILE = "src/pages/text/meal_plans.txt";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    //==================================================================================================================
+    //==============================================================================================================
     // Constructor
-    //==================================================================================================================
+    //==============================================================================================================
     public CustomCalendarPanel() {
         setLayout(new BorderLayout());
         currentDate = LocalDate.now();
 
-        // Header with month navigation
+        // Header
         JPanel headerPanel = new JPanel(new BorderLayout());
         JButton prevButton = new JButton("<");
         JButton nextButton = new JButton(">");
@@ -50,7 +56,7 @@ public class CustomCalendarPanel extends JPanel {
         headerPanel.add(nextButton, BorderLayout.EAST);
         add(headerPanel, BorderLayout.NORTH);
 
-        // Main calendar container
+        // calendar container
         calendarPanel = new JPanel(new BorderLayout());
         add(calendarPanel, BorderLayout.CENTER);
 
@@ -58,9 +64,9 @@ public class CustomCalendarPanel extends JPanel {
         refreshCalendar();
     }
 
-    //==================================================================================================================
+    //==============================================================================================================
     // Calendar Rendering
-    //==================================================================================================================
+    //==============================================================================================================
     private void refreshCalendar() {
         calendarPanel.removeAll();
 
@@ -102,9 +108,9 @@ public class CustomCalendarPanel extends JPanel {
                     && mealPlans.get(dateStr).values().stream().anyMatch(l -> !l.isEmpty());
 
             if (date.equals(LocalDate.now())) {
-                dayButton.setBackground(new Color(173, 216, 230)); // Current day
+                dayButton.setBackground(new Color(173, 216, 230));
             } else if (hasMealPlan) {
-                dayButton.setBackground(new Color(144, 238, 144)); // Planned day
+                dayButton.setBackground(new Color(144, 238, 144));
             } else {
                 dayButton.setBackground(Color.WHITE);
             }
@@ -113,7 +119,6 @@ public class CustomCalendarPanel extends JPanel {
             daysGrid.add(dayButton);
         }
 
-        // Combine day header + grid
         calendarPanel.add(daysHeader, BorderLayout.NORTH);
         calendarPanel.add(daysGrid, BorderLayout.CENTER);
 
@@ -121,9 +126,9 @@ public class CustomCalendarPanel extends JPanel {
         calendarPanel.repaint();
     }
 
-    //==================================================================================================================
+    //==============================================================================================================
     // Sidebar for Planned Meals
-    //==================================================================================================================
+    //==============================================================================================================
     private void openDaySidebar(String dateStr, JButton dayButton) {
         Map<String, List<Page4.Recipe>> dayMeals = mealPlans.getOrDefault(dateStr, new HashMap<>());
         JDialog dialog = new JDialog((Frame) null, "Planned Recipes - " + dateStr, true);
@@ -136,7 +141,6 @@ public class CustomCalendarPanel extends JPanel {
         JScrollPane scrollPane = new JScrollPane(contentPanel);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
 
-        // Display each meal type
         for (String mealType : new String[]{"Breakfast", "Lunch", "Dinner", "Snack"}) {
             List<Page4.Recipe> recipes = dayMeals.getOrDefault(mealType, new ArrayList<>());
 
@@ -157,15 +161,15 @@ public class CustomCalendarPanel extends JPanel {
                 card.setBorder(new CompoundBorder(new EmptyBorder(5, 5, 5, 5), new LineBorder(Color.GRAY, 1)));
                 card.setMaximumSize(new Dimension(400, 100));
 
-                JLabel imgLabel = new JLabel(Page4.loadImageIconStatic(r.imagePath, 80, 80));
+                JLabel imgLabel = new JLabel(loadImageIconStatic(r.imagePath, 80, 80));
                 card.add(imgLabel, BorderLayout.WEST);
 
                 JPanel infoPanel = new JPanel();
                 infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
                 infoPanel.setBorder(new EmptyBorder(5, 10, 5, 5));
-                infoPanel.add(new JLabel(r.name));
-                infoPanel.add(new JLabel("Calories: " + r.calories + " | Protein: " + r.protein + "g"));
-                infoPanel.add(new JLabel("Carbs: " + r.carbs + " | Cost: $" + r.cost));
+                infoPanel.add(new JLabel(r.recipe_name));
+                infoPanel.add(new JLabel(String.format("Cost: $%.2f | Cart: $%.2f | Nutrition: %s",
+                        r.cost_per_serving, r.cart_cost, r.nutrition_grade)));
                 card.add(infoPanel, BorderLayout.CENTER);
 
                 JButton removeBtn = new JButton("Remove");
@@ -182,7 +186,6 @@ public class CustomCalendarPanel extends JPanel {
                 contentPanel.add(card);
             }
 
-            // Separator line
             JSeparator separator = new JSeparator(SwingConstants.HORIZONTAL);
             separator.setMaximumSize(new Dimension(Integer.MAX_VALUE, 2));
             contentPanel.add(Box.createVerticalStrut(5));
@@ -201,9 +204,9 @@ public class CustomCalendarPanel extends JPanel {
         dialog.setVisible(true);
     }
 
-    //==================================================================================================================
+    //==============================================================================================================
     // Meal Type Selection
-    //==================================================================================================================
+    //==============================================================================================================
     private void openMealTypeDialog(LocalDate date, JButton dayButton) {
         String dateStr = DATE_FORMAT.format(date);
         JDialog dialog = new JDialog((Frame) null, "Select Meal Type", true);
@@ -228,9 +231,9 @@ public class CustomCalendarPanel extends JPanel {
         dialog.setVisible(true);
     }
 
-    //==================================================================================================================
+    //==============================================================================================================
     // Meal Editor Dialog
-    //==================================================================================================================
+    //==============================================================================================================
     private void openMealEditorDialog(String dateStr, String mealType, JButton dayButton) {
         JDialog dialog = new JDialog((Frame) null, "Edit " + mealType + " for " + dateStr, true);
         dialog.setSize(800, 600);
@@ -242,8 +245,8 @@ public class CustomCalendarPanel extends JPanel {
         JScrollPane scrollPane = new JScrollPane(recipePanel);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
 
-        List<Page4.Recipe> allRecipes = Page4.loadRecipesFromFile("src/pages/text/recipes.txt");
-        allRecipes.addAll(Page4.loadRecipesFromFile("src/pages/text/custom_recipes.txt"));
+        List<Page4.Recipe> allRecipes = loadRecipesFromFile("src/pages/text/recipes.txt");
+        allRecipes.addAll(loadRecipesFromFile("src/pages/text/custom_recipes.txt"));
 
         List<Page4.Recipe> selected = mealPlans.getOrDefault(dateStr, new HashMap<>())
                 .getOrDefault(mealType, new ArrayList<>());
@@ -251,10 +254,7 @@ public class CustomCalendarPanel extends JPanel {
         for (Page4.Recipe r : allRecipes) {
             recipePanel.add(createRecipeCard(r, () -> {
                 if (selected.contains(r)) selected.remove(r);
-                else {
-                    selected.add(r);
-                    JOptionPane.showMessageDialog(dialog, r.name + " added to " + mealType + " successfully!");
-                }
+                else selected.add(r);
                 saveMealPlan(dateStr, mealType, selected);
                 refreshCalendar();
             }, selected.contains(r) ? "Remove" : "Add"));
@@ -273,25 +273,22 @@ public class CustomCalendarPanel extends JPanel {
         dialog.setVisible(true);
     }
 
-    //==================================================================================================================
+    //==============================================================================================================
     // Recipe Card
-    //==================================================================================================================
+    //==============================================================================================================
     private JPanel createRecipeCard(Page4.Recipe recipe, Runnable onClick, String buttonLabel) {
         JPanel card = new JPanel(new BorderLayout(15, 10));
         card.setBorder(new CompoundBorder(new EmptyBorder(5, 5, 5, 5), new LineBorder(Color.GRAY, 1)));
         card.setMaximumSize(new Dimension(600, 120));
 
-        JLabel imgLabel = new JLabel(Page4.loadImageIconStatic(recipe.imagePath, 100, 100));
+        JLabel imgLabel = new JLabel(loadImageIconStatic(recipe.imagePath, 100, 100));
         card.add(imgLabel, BorderLayout.WEST);
 
         JPanel infoPanel = new JPanel();
         infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
         infoPanel.setBorder(new EmptyBorder(5, 10, 5, 5));
-        infoPanel.add(new JLabel(recipe.name));
-        infoPanel.add(new JLabel("Calories: " + recipe.calories));
-        infoPanel.add(new JLabel("Protein: " + recipe.protein + "g"));
-        infoPanel.add(new JLabel("Carbs: " + recipe.carbs + "g"));
-        infoPanel.add(new JLabel("Cost: $" + recipe.cost));
+        infoPanel.add(new JLabel(recipe.recipe_name));
+        infoPanel.add(new JLabel(String.format("Calories: %.2f | Cost: $%.2f", recipe.recipe_cos_sum, recipe.cost_per_serving)));
         card.add(infoPanel, BorderLayout.CENTER);
 
         JButton button = new JButton(buttonLabel);
@@ -301,9 +298,9 @@ public class CustomCalendarPanel extends JPanel {
         return card;
     }
 
-    //==================================================================================================================
+    //==============================================================================================================
     // File Handling
-    //==================================================================================================================
+    //==============================================================================================================
     private void loadAllMealPlans() {
         mealPlans.clear();
         File file = new File(MEAL_PLAN_FILE);
@@ -338,7 +335,7 @@ public class CustomCalendarPanel extends JPanel {
             for (String date : mealPlans.keySet()) {
                 for (String meal : mealPlans.get(date).keySet()) {
                     for (Page4.Recipe r : mealPlans.get(date).get(meal)) {
-                        pw.println(date + "|" + meal + "|" + r.name);
+                        pw.println(date + "|" + meal + "|" + r.recipe_name);
                     }
                 }
             }
@@ -349,11 +346,31 @@ public class CustomCalendarPanel extends JPanel {
 
     private Page4.Recipe findRecipeByName(String name) {
         List<Page4.Recipe> all = new ArrayList<>();
-        all.addAll(Page4.loadRecipesFromFile("src/pages/text/recipes.txt"));
-        all.addAll(Page4.loadRecipesFromFile("src/pages/text/custom_recipes.txt"));
+        all.addAll(loadRecipesFromFile("src/pages/text/recipes.txt"));
+        all.addAll(loadRecipesFromFile("src/pages/text/custom_recipes.txt"));
         for (Page4.Recipe r : all) {
-            if (r.name.equalsIgnoreCase(name)) return r;
+            if (r.recipe_name.equalsIgnoreCase(name)) return r;
         }
         return null;
+    }
+
+    //==============================================================================================================
+    // Recipe Loader Helper
+    //==============================================================================================================
+    private List<Page4.Recipe> loadRecipesFromFile(String path) {
+        Page4 temp = new Page4();
+        return temp.loadRecipes(path);
+    }
+
+    //==============================================================================================================
+    // Image Helper
+    //==============================================================================================================
+    private static ImageIcon loadImageIconStatic(String path, int width, int height) {
+        if (path == null || path.isEmpty()) return null;
+        File f = new File(path);
+        if (!f.exists()) return null;
+        ImageIcon icon = new ImageIcon(f.getAbsolutePath());
+        Image img = icon.getImage();
+        return new ImageIcon(img.getScaledInstance(width, height, Image.SCALE_SMOOTH));
     }
 }
