@@ -372,6 +372,39 @@ class MySQLHandler:
         finally:
             if cursor:
                 cursor.close()
+    
+    '''
+    The following methods use a helper method along with the
+    fetch_one() method to get specific fields of the recipe table.
+
+    Parameters:
+        recipe_id (int): The id of the recipe to pull from
+
+    Example Usage of Three Methods:
+    recipe_id = 1
+
+    num_ing = db.get_num_ingredients(recipe_id)
+    cost_per_serv = db.get_cost_per_serving(recipe_id)
+    grade = db.get_nutrition_grade(recipe_id)
+    '''
+
+    def get_num_ingredients(self, recipe_id: int) -> Optional[int]:
+        return self.get_recipe_helper(recipe_id, "num_ingredients")
+    
+    def get_ingredient_cost_sum(self, recipe_id: int) -> Optional[float]:
+        return self.get_recipe_helper(recipe_id, "ingredient_cost_sum")
+    
+    def get_cost_cook(self, recipe_id: int) -> Optional[float]:
+        return self.get_recipe_helper(recipe_id, "cost_cook")
+    
+    def get_cost_per_serving(self, recipe_id: int) -> Optional[float]:
+        return self.get_recipe_helper(recipe_id, "cost_per_serving")
+    
+    def get_cart_cost(self, recipe_id: int) -> Optional[float]:
+        return self.get_recipe_helper(recipe_id, "cart_cost")
+    
+    def get_nutrition_grade(self, recipe_id: int) -> Optional[str]:
+        return self.get_recipe_helper(recipe_id, "nutrition_grade")
 
 # Ingredient / Recipe Helpers
 
@@ -535,8 +568,6 @@ class MySQLHandler:
             if cursor:
                 cursor.close()
     
-    
-    
     def insert_ingredient_object(self, ingredient: Ingredient) -> Optional[int]:
         """
         Insert an ingredient dataclass object into the Ingredients table.
@@ -636,3 +667,14 @@ class MySQLHandler:
             if n.get("displayName", "").lower() == nutrient_name.lower():
                 return n.get("quantity", 0.0)
         return 0.0
+    
+    # Helper: Call fetch_one() with other paramters
+    def get_recipe_helper(self, recipe_id: int, column: str) -> Optional[Any]:
+        """
+        Internal helper to fetch a single column from the Recipes table.
+        """
+        row = self.fetch_one(
+            f"SELECT {column} FROM Recipes WHERE recipe_ID = %s",
+            (recipe_id,)
+        )
+        return row[column] if row is not None else None
