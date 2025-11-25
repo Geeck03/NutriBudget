@@ -8,6 +8,8 @@ import json
 from py4j.clientserver import ClientServer
 import time
 
+server = None 
+stop_event = threading.Event()
 # ===================== KrogerWrapper (unchanged) =====================
 class KrogerWrapper:
     def __init__(self):
@@ -48,17 +50,17 @@ class KrogerWrapper:
             return json.dumps({"error": str(e)})
 
 # ===================== Py4J server setup =====================
-def start_py4j_server(ready_event):
+def start_py4j_server(ready_event, stop_event):
+    global server
     wrapper = KrogerWrapper()
     server = ClientServer(python_server_entry_point=wrapper)
     print("✅ Python Py4J server running on default ports...")
     ready_event.set()
     try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("Py4J Server stopped.")
-
+        while not stop_event.is_set(): 
+            time.sleep(0.5)
+    finally: 
+        server.shutdown() 
 
 
 
@@ -99,7 +101,7 @@ def main():
     
 
     print ("\n=== Connected to Database ===")
-    print("Attempt 2\n")
+    print("Attempt 3\n")
 
     # Insert sample ingredients
 
@@ -213,7 +215,7 @@ def main():
 
 if __name__ == "__main__":
     py4j_ready = threading.Event()
-    py4j_thread = threading.Thread(target=start_py4j_server, args=(py4j_ready,), daemon=False)
+    py4j_thread = threading.Thread(target=start_py4j_server, args=(py4j_ready, stop_event), daemon=True)
     py4j_thread.start()
 
     py4j_ready.wait()
@@ -226,4 +228,4 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print(" Python process exiting")
+        stop_event.set()
