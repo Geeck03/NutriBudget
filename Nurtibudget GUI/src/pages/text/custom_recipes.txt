@@ -1,0 +1,2 @@
+recipe_ID	recipe_name	recipe_cos_sum	cost_cook	cost_per_serving	cart_cost	nutrition_grade	description	imagePath	total_portions	edible_days	ingredients_base64	instructions_base64
+1	test	0.00	0.00	0.00	0.00	E			3	2	W10=	WyIxMjMiLCIxMjMiLCIxMjMiXQ==

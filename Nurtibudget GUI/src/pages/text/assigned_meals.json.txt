@@ -1,0 +1,89 @@
+{
+  "week_start": "2025-11-17",
+  "week_end": "2025-11-23",
+  "days": [
+    {
+      "date": "2025-11-17",
+      "meals": []
+    },
+    {
+      "date": "2025-11-18",
+      "meals": [
+        {
+          "recipe_ID": 1,
+          "recipe_name": "Chicken Alfredo",
+          "portions_assigned": 1,
+          "total_portions": 4,
+          "portions_remaining": 3,
+          "edible_days": 3,
+          "expires_on": "2025-11-21",
+          "cost_per_serving": 3.14
+        }
+      ]
+    },
+    {
+      "date": "2025-11-19",
+      "meals": [
+        {
+          "recipe_ID": 1,
+          "recipe_name": "Chicken Alfredo",
+          "portions_assigned": 1,
+          "total_portions": 4,
+          "portions_remaining": 2,
+          "edible_days": 3,
+          "expires_on": "2025-11-21",
+          "cost_per_serving": 3.14
+        }
+      ]
+    },
+    {
+      "date": "2025-11-20",
+      "meals": []
+    },
+    {
+      "date": "2025-11-21",
+      "meals": [
+        {
+          "recipe_ID": 2,
+          "recipe_name": "Beef Chili",
+          "portions_assigned": 2,
+          "total_portions": 6,
+          "portions_remaining": 4,
+          "edible_days": 5,
+          "expires_on": "2025-11-26",
+          "cost_per_serving": 2.40
+        }
+      ]
+    },
+    {
+      "date": "2025-11-22",
+      "meals": [
+        {
+          "recipe_ID": 1,
+          "recipe_name": "Chicken Alfredo",
+          "portions_assigned": 2,
+          "total_portions": 4,
+          "portions_remaining": 0,
+          "edible_days": 3,
+          "expires_on": "2025-11-21",
+          "cost_per_serving": 3.14
+        }
+      ]
+    },
+    {
+      "date": "2025-11-23",
+      "meals": [
+        {
+          "recipe_ID": 3,
+          "recipe_name": "Taco Bowls",
+          "portions_assigned": 2,
+          "total_portions": 3,
+          "portions_remaining": 1,
+          "edible_days": 2,
+          "expires_on": "2025-11-25",
+          "cost_per_serving": 2.90
+        }
+      ]
+    }
+  ]
+}

@@ -30,8 +30,16 @@ public class Page4 extends JPanel {
         public String imagePath;
         public String description;
 
+        // New (optional) fields
+        public int total_portions = 1; // default 1 if not provided
+        public int edible_days = 3;    // default 3 days if not provided
+
+        /**
+         * Backwards-compatible constructor (keeps older signature).
+         */
         public Recipe(int recipe_ID, String recipe_name, double recipe_cos_sum, double cost_cook,
-            double cost_per_serving, double cart_cost, String nutrition_grade, List<IngredientEntry> recipe_ingredients, List<String> instructions, String description, String imagePath) {
+                      double cost_per_serving, double cart_cost, String nutrition_grade,
+                      List<IngredientEntry> recipe_ingredients, List<String> instructions, String description, String imagePath) {
             this.recipe_ID = recipe_ID;
             this.recipe_name = recipe_name;
             this.recipe_cos_sum = recipe_cos_sum;
@@ -43,6 +51,18 @@ public class Page4 extends JPanel {
             this.instructions = instructions != null ? instructions : new ArrayList<>();
             this.description = description;
             this.imagePath = imagePath;
+            // total_portions and edible_days remain defaults
+        }
+
+
+        public Recipe(int recipe_ID, String recipe_name, double recipe_cos_sum, double cost_cook,
+                      double cost_per_serving, double cart_cost, String nutrition_grade,
+                      List<IngredientEntry> recipe_ingredients, List<String> instructions, String description, String imagePath,
+                      int total_portions, int edible_days) {
+            this(recipe_ID, recipe_name, recipe_cos_sum, cost_cook, cost_per_serving, cart_cost,
+                    nutrition_grade, recipe_ingredients, instructions, description, imagePath);
+            this.total_portions = Math.max(1, total_portions);
+            this.edible_days = Math.max(0, edible_days);
         }
     }
 
@@ -211,8 +231,8 @@ public class Page4 extends JPanel {
         if (icon != null) imageLabel.setIcon(icon);
         else imageLabel.setText("[No Image]");
 
-        JLabel infoLabel = new JLabel(String.format("<html>Cost Cook: $%.2f<br>Cost per Serving: $%.2f<br>Cart Cost: $%.2f<br>Nutrition: %s</html>",
-                r.cost_cook, r.cost_per_serving, r.cart_cost, r.nutrition_grade));
+        JLabel infoLabel = new JLabel(String.format("<html>Cost Cook: $%.2f<br>Cost per Serving: $%.2f<br>Cart Cost: $%.2f<br>Nutrition: %s<br>Total portions: %d | Good for: %d days</html>",
+                r.cost_cook, r.cost_per_serving, r.cart_cost, r.nutrition_grade, r.total_portions, r.edible_days));
 
         JTextArea descArea = new JTextArea(r.description != null ? r.description : "No description available.");
         descArea.setLineWrap(true);
@@ -277,8 +297,8 @@ public class Page4 extends JPanel {
         dialog.setVisible(true);
     }
     //==============================================================================================================
-// Add / Edit Recipe Dialog
-//==============================================================================================================
+    // Add / Edit Recipe Dialog
+    //==============================================================================================================
     private void openAddRecipeDialog(Recipe existing) {
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
                 existing != null ? "Edit Recipe" : "Add Recipe", true);
@@ -427,6 +447,17 @@ public class Page4 extends JPanel {
         mainPanel.add(new JLabel("Instructions (one per line):"));
         mainPanel.add(new JScrollPane(instrArea));
 
+        // New fields: total_portions and edible_days
+        JTextField totalPortionsField = new JTextField(existing != null ? String.valueOf(existing.total_portions) : "1", 5);
+        JTextField edibleDaysField = new JTextField(existing != null ? String.valueOf(existing.edible_days) : "3", 5);
+        JPanel extrasPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        extrasPanel.add(new JLabel("Total portions:"));
+        extrasPanel.add(totalPortionsField);
+        extrasPanel.add(Box.createHorizontalStrut(10));
+        extrasPanel.add(new JLabel("Edible days:"));
+        extrasPanel.add(edibleDaysField);
+        mainPanel.add(extrasPanel);
+
         // Save button
         JButton saveBtn = new JButton("Save Recipe");
         saveBtn.addActionListener(e -> {
@@ -465,6 +496,9 @@ public class Page4 extends JPanel {
                     if (!line.trim().isEmpty()) instrList.add(line.trim());
                 }
 
+                int totalPortions = Math.max(1, safeParseInt(totalPortionsField.getText()));
+                int edibleDays = Math.max(0, safeParseInt(edibleDaysField.getText()));
+
                 Recipe r;
                 if (existing != null) {
                     existing.recipe_name = name;
@@ -476,10 +510,12 @@ public class Page4 extends JPanel {
                     existing.imagePath = imagePath;
                     existing.recipe_ingredients = ingredientList;
                     existing.instructions = instrList;
+                    existing.total_portions = totalPortions;
+                    existing.edible_days = edibleDays;
                     r = existing;
                 } else {
                     int newID = recipes.stream().mapToInt(rec -> rec.recipe_ID).max().orElse(0) + 1;
-                    r = new Recipe(newID, name, 0.0, costCook, costPer, cartCost, nutrition, ingredientList, instrList, desc, imagePath);
+                    r = new Recipe(newID, name, 0.0, costCook, costPer, cartCost, nutrition, ingredientList, instrList, desc, imagePath, totalPortions, edibleDays);
                     recipes.add(r);
                 }
 
@@ -507,28 +543,63 @@ public class Page4 extends JPanel {
         if (!f.exists()) return list;
 
         try (BufferedReader br = new BufferedReader(new FileReader(f))) {
-            br.readLine(); // header
+            String header = br.readLine(); // header (may be null)
             String line;
             while ((line = br.readLine()) != null) {
                 if (line.trim().isEmpty()) continue;
                 String[] p = line.split("\t");
-                if (p.length < 10) continue;
+
+
+                if (p.length < 9) continue;
+
                 int id = safeParseInt(p[0]);
-                String name = p[1];
-                double cos_sum = safeParseDouble(p[2]);
-                double costCook = safeParseDouble(p[3]);
-                double costPer = safeParseDouble(p[4]);
-                double cart = safeParseDouble(p[5]);
-                String nutrition = p[6];
-                String desc = p[7];
-                String img = p[8];
+                String name = p.length > 1 ? p[1] : "";
+                double cos_sum = p.length > 2 ? safeParseDouble(p[2]) : 0.0;
+                double costCook = p.length > 3 ? safeParseDouble(p[3]) : 0.0;
+                double costPer = p.length > 4 ? safeParseDouble(p[4]) : 0.0;
+                double cart = p.length > 5 ? safeParseDouble(p[5]) : 0.0;
+                String nutrition = p.length > 6 ? p[6] : "";
+                String desc = p.length > 7 ? p[7] : "";
+                String img = p.length > 8 ? p[8] : "";
+
+                // Defaults for new fields
+                int totalPortions = 1;
+                int edibleDays = 3;
+                int ingredientsIndex = 9;
+                int instructionsIndex = 10;
+
+                if (p.length >= 11) {
+
+                    boolean parsedExtras = false;
+                    try {
+                        totalPortions = safeParseInt(p[9]);
+                        edibleDays = safeParseInt(p[10]);
+                        ingredientsIndex = 11;
+                        instructionsIndex = 12;
+                        parsedExtras = true;
+                    } catch (Exception ignored) {
+                        totalPortions = 1;
+                        edibleDays = 3;
+                        ingredientsIndex = 9;
+                        instructionsIndex = 10;
+                    }
+
+
+                    if (parsedExtras && p.length <= 11) {
+                        ingredientsIndex = 11;
+                        instructionsIndex = 12;
+                    }
+                } else {
+                    ingredientsIndex = 9;
+                    instructionsIndex = 10;
+                }
 
                 List<IngredientEntry> ingrList = new ArrayList<>();
                 List<String> instrList = new ArrayList<>();
 
                 try {
-                    if (!p[9].isEmpty()) {
-                        String ingrJson = new String(Base64.getDecoder().decode(p[9]));
+                    if (p.length > ingredientsIndex && p[ingredientsIndex] != null && !p[ingredientsIndex].isEmpty()) {
+                        String ingrJson = new String(Base64.getDecoder().decode(p[ingredientsIndex]));
                         JSONArray arr = new JSONArray(ingrJson);
                         for (int i = 0; i < arr.length(); i++) {
                             JSONObject o = arr.getJSONObject(i);
@@ -542,16 +613,19 @@ public class Page4 extends JPanel {
                             ingrList.add(ie);
                         }
                     }
-                    if (p.length > 10 && !p[10].isEmpty()) {
-                        String instrJson = new String(Base64.getDecoder().decode(p[10]));
+                } catch (Exception ex) {
+                }
+
+                try {
+                    if (p.length > instructionsIndex && p[instructionsIndex] != null && !p[instructionsIndex].isEmpty()) {
+                        String instrJson = new String(Base64.getDecoder().decode(p[instructionsIndex]));
                         JSONArray ia = new JSONArray(instrJson);
                         for (int i = 0; i < ia.length(); i++) instrList.add(ia.getString(i));
                     }
                 } catch (Exception ex) {
-
                 }
 
-                Recipe r = new Recipe(id, name, cos_sum, costCook, costPer, cart, nutrition, ingrList, instrList, desc, img);
+                Recipe r = new Recipe(id, name, cos_sum, costCook, costPer, cart, nutrition, ingrList, instrList, desc, img, totalPortions, edibleDays);
                 list.add(r);
             }
         } catch (IOException e) {
@@ -566,7 +640,7 @@ public class Page4 extends JPanel {
             File file = new File(CUSTOM_RECIPE_FILE);
             if (!file.getParentFile().exists()) file.getParentFile().mkdirs();
             try (FileWriter fw = new FileWriter(file)) {
-                fw.write("recipe_ID\trecipe_name\trecipe_cos_sum\tcost_cook\tcost_per_serving\tcart_cost\tnutrition_grade\tdescription\timagePath\tingredients_base64\tinstructions_base64\n");
+                fw.write("recipe_ID\trecipe_name\trecipe_cos_sum\tcost_cook\tcost_per_serving\tcart_cost\tnutrition_grade\tdescription\timagePath\ttotal_portions\tedible_days\tingredients_base64\tinstructions_base64\n");
                 for (Recipe r : recipes) {
                     JSONArray ingrArr = new JSONArray();
                     for (IngredientEntry ie : r.recipe_ingredients) {
@@ -584,16 +658,18 @@ public class Page4 extends JPanel {
                     for (String s : r.instructions) instrArr.put(s);
                     String instrBase64 = Base64.getEncoder().encodeToString(instrArr.toString().getBytes());
 
-                    fw.write(String.format("%d\t%s\t%.2f\t%.2f\t%.2f\t%.2f\t%s\t%s\t%s\t%s\t%s\n",
+                    fw.write(String.format("%d\t%s\t%.2f\t%.2f\t%.2f\t%.2f\t%s\t%s\t%s\t%d\t%d\t%s\t%s\n",
                             r.recipe_ID,
-                            r.recipe_name,
+                            r.recipe_name.replace("\t", " ").replace("\n", " "),
                             r.recipe_cos_sum,
                             r.cost_cook,
                             r.cost_per_serving,
                             r.cart_cost,
                             r.nutrition_grade != null ? r.nutrition_grade : "",
-                            r.description != null ? r.description.replace("\n"," ") : "",
+                            r.description != null ? r.description.replace("\n", " ") : "",
                             r.imagePath != null ? r.imagePath : "",
+                            r.total_portions,
+                            r.edible_days,
                             ingrBase64,
                             instrBase64
                     ));
