@@ -1,37 +1,36 @@
 package pages;
 
-import javax.swing.*;
-import java.awt.*;
-import java.nio.file.*;
-import java.util.*;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import py4j.ClientServer;
 import bridge.IKrogerWrapper;
+import java.awt.*;
+import java.sql.*;
+import java.util.*;
+import java.util.List;
+import javax.swing.*;
 
 public class SuggestionsPage extends JPanel {
 
-    private final Color OKSTATE_ORANGE = new Color(244, 125, 32);
-    private final Color DARK_GRAY = new Color(45, 45, 45);
     private final Color LIGHT_GRAY = new Color(240, 240, 240);
-    private final Color WHITE = Color.WHITE;
+    private final Color DARK_GRAY = new Color(45, 45, 45);
 
     private JPanel gridPanel;
     private JScrollPane scrollPane;
+    private IKrogerWrapper krogerWrapper; // Optional: fetch product prices
+    private Connection dbConnection; // MySQL connection
 
-    private ClientServer clientServer;
-    private IKrogerWrapper pythonEntry;
+    private JComboBox<String> priceFilterDropdown;
+    private JComboBox<String> nutriScoreFilter;
 
-    public SuggestionsPage() {
+    private List<Recipe> allRecipes;
+
+    public SuggestionsPage(Connection dbConnection, IKrogerWrapper krogerWrapper) {
+        this.dbConnection = dbConnection;
+        this.krogerWrapper = krogerWrapper;
 
         setLayout(new BorderLayout());
         setBackground(LIGHT_GRAY);
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        connectToPython();
-
-        // =========== TITLE ===========
-        JLabel title = new JLabel("Suggestions", SwingConstants.CENTER);
+        JLabel title = new JLabel("Recipe Suggestions", SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
         title.setForeground(DARK_GRAY);
 
@@ -41,131 +40,217 @@ public class SuggestionsPage extends JPanel {
         titlePanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
         add(titlePanel, BorderLayout.NORTH);
 
-        // =========== GRID AREA ===========
+        // Filter panel
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 10));
+        filterPanel.setBackground(LIGHT_GRAY);
+
+        // Max Price dropdown
+        filterPanel.add(new JLabel("Max Price ($):"));
+        String[] priceOptions = {"No Limit", "5", "10", "15", "20", "25", "30"};
+        priceFilterDropdown = new JComboBox<>(priceOptions);
+        priceFilterDropdown.setSelectedIndex(0);
+        filterPanel.add(priceFilterDropdown);
+
+        // NutriScore filter
+        filterPanel.add(new JLabel("NutriScore:"));
+        nutriScoreFilter = new JComboBox<>(new String[]{"A", "B", "C", "D", "E"});
+        nutriScoreFilter.setSelectedIndex(0);
+        filterPanel.add(nutriScoreFilter);
+
+        JButton applyFilterButton = new JButton("Apply Filters");
+        filterPanel.add(applyFilterButton);
+
+        add(filterPanel, BorderLayout.NORTH);
+
+        // Grid panel
         gridPanel = new JPanel(new WrapLayout(FlowLayout.LEFT, 15, 15));
         scrollPane = new JScrollPane(gridPanel);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-
         add(scrollPane, BorderLayout.CENTER);
 
-        // Load suggestions immediately
-        SwingUtilities.invokeLater(this::loadSuggestions);
+        // Load recipes
+        SwingUtilities.invokeLater(() -> {
+            allRecipes = fetchRecipesFromDB();
+            updateGrid();
+        });
+
+        // Filter action
+        applyFilterButton.addActionListener(e -> updateGrid());
     }
 
-    // =====================================================================
-    // Python connection
-    // =====================================================================
-    private void connectToPython() {
-        try {
-            clientServer = new ClientServer(null);
-            pythonEntry = (IKrogerWrapper) clientServer.getPythonServerEntryPoint(
-                    new Class[]{IKrogerWrapper.class}
-            );
-            System.out.println("SuggestionsPage: Connected to Python");
-        } catch (Exception e) {
-            System.err.println("Failed to connect to Python");
-            e.printStackTrace();
-        }
-    }
-
-    // =====================================================================
-    // Load favorites → send to python → build suggestions grid
-    // =====================================================================
-    private void loadSuggestions() {
-
+    // Apply filters and refresh grid
+    private void updateGrid() {
         gridPanel.removeAll();
 
-        JLabel loading = new JLabel("Generating suggestions...", SwingConstants.CENTER);
-        loading.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        gridPanel.setLayout(new BorderLayout());
-        gridPanel.add(loading, BorderLayout.CENTER);
-        gridPanel.revalidate();
-        gridPanel.repaint();
+        double maxPrice = Double.MAX_VALUE;
+        String minNutriScore = (String) nutriScoreFilter.getSelectedItem();
 
-        new Thread(() -> {
+        // Get selected max price from dropdown
+        String selectedPrice = (String) priceFilterDropdown.getSelectedItem();
+        if (selectedPrice != null && !selectedPrice.equals("No Limit")) {
             try {
-                JSONObject favoritesJson = collectFavorites();
-
-                // CALL PYTHON AI
-                String response = pythonEntry.generateSuggestions(favoritesJson.toString());
-                JSONArray arr = new JSONArray(response);
-
-                SwingUtilities.invokeLater(() -> {
-                    buildGrid(arr);
-                });
-
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-        }).start();
-    }
-
-    // =====================================================================
-    // Collect favorites from Page2's stored files
-    // =====================================================================
-    private JSONObject collectFavorites() {
-        JSONObject json = new JSONObject();
-        JSONArray ingredientNames = new JSONArray();
-        JSONArray recipeIds = new JSONArray();
-
-        Path favoritesDir = Paths.get("src/pages/favorites");
-
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(favoritesDir, "*.json")) {
-            for (Path p : stream) {
-                String s = Files.readString(p);
-                JSONObject obj = new JSONObject(s);
-                ingredientNames.put(obj.getString("name"));
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+                maxPrice = Double.parseDouble(selectedPrice);
+            } catch (NumberFormatException ignored) {}
         }
 
-        json.put("ingredients", ingredientNames);
-        json.put("recipes", recipeIds); // if you later add recipes, this is ready
-
-        return json;
-    }
-
-    // =====================================================================
-    // Grid builder
-    // =====================================================================
-    private void buildGrid(JSONArray suggestions) {
-        gridPanel.removeAll();
-        gridPanel.setLayout(new WrapLayout(FlowLayout.LEFT, 15, 15));
-
-        for (int i = 0; i < suggestions.length(); i++) {
-            JSONObject s = suggestions.getJSONObject(i);
-            gridPanel.add(createSuggestionCard(s));
+        for (Recipe r : allRecipes) {
+            double totalPrice = r.totalPrice();
+            String recipeNutriScore = r.worstNutriScore();
+            if (totalPrice <= maxPrice && compareNutriScores(recipeNutriScore, minNutriScore) <= 0) {
+                gridPanel.add(createRecipeCard(r));
+            }
         }
 
         gridPanel.revalidate();
         gridPanel.repaint();
     }
 
-    private JPanel createSuggestionCard(JSONObject s) {
+    // Returns -1 if score1 < score2, 0 if equal, 1 if score1 > score2 (A < B < C < D < E)
+    private int compareNutriScores(String score1, String score2) {
+        String order = "ABCDE";
+        return Integer.compare(order.indexOf(score1), order.indexOf(score2));
+    }
 
+    private List<Recipe> fetchRecipesFromDB() {
+        List<Recipe> recipes = new ArrayList<>();
+        String query = "SELECT recipe_ID, recipe_name, instructions FROM Recipes";
+
+        try (Statement stmt = dbConnection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                int id = rs.getInt("recipe_ID");
+                String name = rs.getString("recipe_name");
+                String instructions = rs.getString("instructions");
+
+                List<Ingredient> ingredients = fetchIngredientsForRecipe(id);
+                recipes.add(new Recipe(id, name, instructions, ingredients));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return recipes;
+    }
+
+    private List<Ingredient> fetchIngredientsForRecipe(int recipeId) {
+        List<Ingredient> ingredients = new ArrayList<>();
+        String query = "SELECT I.ingredient_ID, I.ingredient_name, I.calories, I.protein, I.carbs, I.fats, I.nutriscore, I.price " +
+                       "FROM RecipeIngredients RI " +
+                       "JOIN Ingredients I ON RI.ingredient_ID = I.ingredient_ID " +
+                       "WHERE RI.recipe_ID = ?";
+
+        try (PreparedStatement ps = dbConnection.prepareStatement(query)) {
+            ps.setInt(1, recipeId);
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                ingredients.add(new Ingredient(
+                        rs.getInt("ingredient_ID"),
+                        rs.getString("ingredient_name"),
+                        rs.getDouble("calories"),
+                        rs.getDouble("protein"),
+                        rs.getDouble("carbs"),
+                        rs.getDouble("fats"),
+                        rs.getString("nutriscore"),
+                        rs.getDouble("price")
+                ));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return ingredients;
+    }
+
+    private JPanel createRecipeCard(Recipe r) {
         JPanel card = new JPanel();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setPreferredSize(new Dimension(200, 230));
+        card.setPreferredSize(new Dimension(220, 200));
         card.setBackground(Color.WHITE);
         card.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Color.LIGHT_GRAY),
                 BorderFactory.createEmptyBorder(10, 10, 10, 10)
         ));
 
-        JLabel name = new JLabel(s.getString("name"), SwingConstants.CENTER);
+        JLabel name = new JLabel("<html><center>" + r.name + "</center></html>");
         name.setFont(new Font("SansSerif", Font.BOLD, 16));
         name.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JTextArea desc = new JTextArea(s.getString("description"));
-        desc.setLineWrap(true);
-        desc.setEditable(false);
-        desc.setBackground(Color.WHITE);
+        JTextArea ingredientsArea = new JTextArea();
+        ingredientsArea.setText(r.ingredientsString() + "\nPrice: $" + String.format("%.2f", r.totalPrice()) +
+                "\nNutriScore: " + r.worstNutriScore());
+        ingredientsArea.setWrapStyleWord(true);
+        ingredientsArea.setLineWrap(true);
+        ingredientsArea.setEditable(false);
+        ingredientsArea.setBackground(Color.WHITE);
 
         card.add(name);
-        card.add(Box.createVerticalStrut(8));
-        card.add(desc);
+        card.add(Box.createRigidArea(new Dimension(0, 5)));
+        card.add(ingredientsArea);
 
         return card;
+    }
+
+    // Inner classes
+    private static class Recipe {
+        int id;
+        String name;
+        String instructions;
+        List<Ingredient> ingredients;
+
+        public Recipe(int id, String name, String instructions, List<Ingredient> ingredients) {
+            this.id = id;
+            this.name = name;
+            this.instructions = instructions;
+            this.ingredients = ingredients;
+        }
+
+        public String ingredientsString() {
+            StringBuilder sb = new StringBuilder();
+            for (Ingredient i : ingredients) {
+                sb.append(i.name).append(", ");
+            }
+            return sb.length() > 2 ? sb.substring(0, sb.length() - 2) : "";
+        }
+
+        public double totalPrice() {
+            double sum = 0;
+            for (Ingredient i : ingredients) sum += i.price;
+            return sum;
+        }
+
+        public String worstNutriScore() {
+            String worst = "A";
+            String order = "ABCDE";
+            for (Ingredient i : ingredients) {
+                if (order.indexOf(i.nutriscore) > order.indexOf(worst)) worst = i.nutriscore;
+            }
+            return worst;
+        }
+    }
+
+    private static class Ingredient {
+        int id;
+        String name;
+        double calories;
+        double protein;
+        double carbs;
+        double fats;
+        String nutriscore;
+        double price;
+
+        public Ingredient(int id, String name, double calories, double protein, double carbs, double fats, String nutriscore, double price) {
+            this.id = id;
+            this.name = name;
+            this.calories = calories;
+            this.protein = protein;
+            this.carbs = carbs;
+            this.fats = fats;
+            this.nutriscore = nutriscore;
+            this.price = price;
+        }
     }
 }

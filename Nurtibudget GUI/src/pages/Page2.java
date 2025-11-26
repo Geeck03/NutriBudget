@@ -9,6 +9,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 
+
 import py4j.ClientServer;
 import py4j.Py4JNetworkException;
 import org.json.JSONArray;
@@ -235,13 +236,36 @@ public class Page2 extends JPanel {
         return card;
     }
 
-    private JPanel createRecipeCard(Recipe r) {
-        JPanel card = baseCard(r.name, r.imagePath);
-        card.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mousePressed(java.awt.event.MouseEvent e) { showSidebar(r); }
-        });
-        return card;
-    }
+private JPanel createRecipeCard(Recipe r) {
+    JPanel card = baseCard(r.name, r.imagePath);
+
+    // -------------------------------------------
+    // NutriScore Badge
+    // -------------------------------------------
+    String score = NutriScore.gradeForRecipe(
+            r.calories, r.protein, r.carbs, r.fat
+    );
+
+    JLabel badge = new JLabel(score);
+    badge.setOpaque(true);
+    badge.setForeground(Color.WHITE);
+    badge.setBackground(nutriColor(score));
+    badge.setFont(new Font("SansSerif", Font.BOLD, 16));
+    badge.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+
+    JPanel badgeWrap = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+    badgeWrap.setOpaque(false);
+    badgeWrap.add(badge);
+
+    card.add(badgeWrap, 0); // add at top
+    // -------------------------------------------
+
+    card.addMouseListener(new java.awt.event.MouseAdapter() {
+        @Override public void mousePressed(java.awt.event.MouseEvent e) { showSidebar(r); }
+    });
+
+    return card;
+}
 
     private JPanel baseCard(String nameText, String imageUrl) {
         JPanel card = new JPanel();
@@ -314,13 +338,78 @@ public class Page2 extends JPanel {
         sidebarVisible = show;
     }
 
-    private JPanel createSidebarContent(Ingredient ing) {
-        return sidebarTemplate(ing.name, ing.imagePath, ing.info, ing.nutrients, ing.name, true);
+private JPanel createSidebarContent(Ingredient ing) {
+    JPanel panel = sidebarTemplate(
+            ing.name,
+            ing.imagePath,
+            ing.info,
+            ing.nutrients,
+            ing.name,
+            true
+    );
+
+    // ---------------------------------------------------
+    // Ingredient NutriScore
+    // ---------------------------------------------------
+    if (ing.nutrients != null && !ing.nutrients.isEmpty()) {
+        String score = NutriScore.gradeForIngredient(ing.nutrients);
+
+        JLabel nutriLabel = new JLabel("NutriScore: " + score);
+        nutriLabel.setOpaque(true);
+        nutriLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
+        nutriLabel.setBackground(nutriColor(score));
+        nutriLabel.setForeground(Color.WHITE);
+        nutriLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        nutriLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(nutriLabel);
     }
 
-    private JPanel createSidebarContent(Recipe r) {
-        return sidebarTemplate(r.name, r.imagePath, r.description, null, String.valueOf(r.id), false);
-    }
+    return panel;
+}
+
+private Color nutriColor(String score) {
+    return switch (score) {
+        case "A" -> new Color(0, 160, 0);
+        case "B" -> new Color(120, 200, 0);
+        case "C" -> new Color(255, 210, 0);
+        case "D" -> new Color(255, 140, 0);
+        default  -> new Color(220, 0, 0); // E
+    };
+}
+
+
+private JPanel createSidebarContent(Recipe r) {
+    JPanel panel = sidebarTemplate(
+            r.name,
+            r.imagePath,
+            r.description,
+            null,
+            String.valueOf(r.id),
+            false
+    );
+
+    // ---------------------------------------------------
+    // Add NutriScore section to the recipe sidebar
+    // ---------------------------------------------------
+    String score = NutriScore.gradeForRecipe(
+            r.calories, r.protein, r.carbs, r.fat
+    );
+
+    JLabel nutriLabel = new JLabel("NutriScore: " + score);
+    nutriLabel.setOpaque(true);
+    nutriLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
+    nutriLabel.setBackground(nutriColor(score));
+    nutriLabel.setForeground(Color.WHITE);
+    nutriLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+    nutriLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+    panel.add(Box.createVerticalStrut(10));
+    panel.add(nutriLabel);
+
+    return panel;
+}
 
     private JPanel sidebarTemplate(String name, String img, String info, List<String> nutrients, String idOrName, boolean ingredient) {
         JPanel panel = new JPanel();
@@ -405,17 +494,20 @@ public class Page2 extends JPanel {
     //==============================================================================================================
     // Favorites / Filtering
     //==============================================================================================================
-    private void toggleFavoriteIngredient(String name, JButton b) {
-        if (favoriteIngredientNames.remove(name)) {
-            b.setText("☆ Favorite");
-            removeFavoriteFile(name);
-        } else {
-            favoriteIngredientNames.add(name);
-            b.setText("★ Favorite");
-            saveFavoriteFile(name);
-        }
-        refreshGrid();
+private void toggleFavoriteIngredient(String name, JButton b) {
+    if (favoriteIngredientNames.remove(name)) {
+        b.setText("☆ Favorite");
+        removeFavoriteFile(name);
+    } else {
+        favoriteIngredientNames.add(name);
+        b.setText("★ Favorite");
+
+        saveFavoriteFile(name);  // already exists
+
     }
+    refreshGrid();
+}
+
 
     private void toggleFavoriteRecipe(int id, JButton b) {
         if (favoriteRecipeIds.remove(id)) b.setText("☆ Favorite");
