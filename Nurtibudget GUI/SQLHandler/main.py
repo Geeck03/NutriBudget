@@ -5,13 +5,28 @@ from dotenv import load_dotenv
 import os
 import threading
 import json
+import py4j
 from py4j.clientserver import ClientServer
+from py4j.clientserver import JavaParameters, PythonParameters
+
 import time
+import sys
+
 
 server = None 
 stop_event = threading.Event()
 # ===================== KrogerWrapper (unchanged) =====================
 class KrogerWrapper:
+    
+    ''' 
+    Check for 
+    '''
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        # older Pythons / unusual environments
+        pass
+
     def __init__(self):
         print("✅ KrogerWrapper initialized using real Kroger API logic.")
 

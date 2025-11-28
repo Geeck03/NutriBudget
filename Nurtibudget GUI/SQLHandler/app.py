@@ -5,17 +5,25 @@ import requests # Library for making HTTP requests
 import base64 # Library for encoding/decoding data in Base64 format
 
 from dataclasses import asdict
-from dataclasses import dataclass
 from dataclasses import dataclass, field
 from typing import List
-
-import requests # Library for making HTTP requests
-import base64 # Library for encoding/decoding data in Base64 format
 import json
 from typing import List, Optional, Dict, Any
 
 from ingredient import Ingredient 
 from ingredient import nutrientInfo
+from MySQLHandler import MySQLHandler   # Your DB wrapper
+
+# List of all the nutrient fields in the ingredient and recipe database 
+NUTRIENT_FIELDS = [
+    "calories", "protein", "carbs", "fats", "fiber", "sugars",
+    "vitamin_a", "vitamin_c", "vitamin_d",
+    "calcium", "iron", "potassium",
+    "sodium", "magnesium", "cholesterol",
+    "saturated_fat", "trans_fat"
+]
+
+
 
 '''
 Listed functions in order they are present: 
@@ -33,8 +41,45 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
 def scaleIngredient(ing: Ingredient, scale: int) -> Ingredient: 
     Modifies an ingredent's nutritional values based on the scale given. 
     Returns a modified version of the ingredient. 
+
+# Create Recipe Scripts 
+def createRecipe(recipe_name: str = "") -> int:  
+    UI| Used when create recipe button is pressed 
+    Creates a new recipe given a recipe name.
+    All values are initialized to zero 
+    returns recipe ID 
+
+def ingredientID(ingredient_obj: Any) -> int:
+    UI| Used when the add to recipe button is clicked from 
+    the create recipe page. 
+    Takes an ingredient name, and returns the ingredient ID. 
+    Creates a new ingredient in the ingredient Table or pulls 
+    from existing entry. 
+    
+def addIngredientToRecipe(recipe_id: int, ingredient_id: int, quantity: float):
+    UI| Page: Edit recipe - > add ingredient -> add to recipe -> 
+    promopted to add quantity on submit call this function. 
+    Takes a recipe id and ingredient id. Does all the
+    functionality to add all the ingredients to the functions 
+    Calls: 
+    def ScaleIngredientFunction(ingredient_dict: Dict[str, Any], quantity: float) -> Dict[str, Any]:
+    def ingredientID(ingredient_obj: Any) -> int:
+    
+
 '''
 
+
+''' 
+Create connection
+'''
+
+# Initialize DB handler
+db = MySQLHandler(
+    host="localhost",
+    database="NBDB",
+    user="root",
+    password="password"
+)
 
 ''''
 Access Token code
@@ -58,7 +103,7 @@ def getAccessToken():
         token = response.json()
         access_token = token.get("access_token")
         #print("Access Token:", access_token)
-    if response.status_code != 200:
+    elif response.status_code != 200:
         print("Error", response.status_code, response.text)
         
     access_token = response.json().get("access_token")
@@ -96,7 +141,8 @@ def location_ID(zipcode: str) -> str:
         print("Error", locationID.status_code, locationID.text)
         return "Error in Location ID retrieval"
     
-    return locationID.text 
+    return locationID.json()["data"][0]["locationId"]
+
 
 '''
 Search Ingredients Functionality
@@ -197,7 +243,7 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
         if isinstance(servings_per_package, dict): 
             servings_per_package = servings_per_package
         elif isinstance(servings_per_package, float):
-            servings_per_package = servings_per_package[0] if servings_per_package else {}
+            servings_per_package = servings_per_package if servings_per_package else {}
         else:
             servings_per_package = {}
             
@@ -336,11 +382,11 @@ def search_ingredients(name: str, search_number: int) -> List[Ingredient]:
     return ingredients_class_list
 
 
-
 '''
+    (OLD)
     Scale the ingredient object given based on the number given such as 2/3, 3, or 0.5 
     Then return the ingredient object that was modified 
-'''
+
 def scaleIngredient(ing: Ingredient, scale: int) -> Ingredient: 
      
      # Scales quanity and percentDailyIntake based on the scale 
@@ -349,3 +395,159 @@ def scaleIngredient(ing: Ingredient, scale: int) -> Ingredient:
          n.percentDailyIntake = n.percentDailyIntake * scale if n.percentDailyIntake else 0 
          
      return ing
+
+Create a New Recipe and return its ID
+UI| Used when create recipe button is clicked 
+'''
+
+def createRecipe(recipe_name: str = "") -> int: 
+    '''
+    Create a new recipe row in the Recipe table. 
+    All values are set as zero
+    Returns the recipe_ID assigned by the db 
+    '''
+
+    ingredient_id = []
+
+    initial_values = { 
+        "recipe_name": recipe_name, 
+        "num_ingredients": 0, 
+        "ingredient_cost_sum": 0, 
+        "cost_cook": 0, 
+        "cost_per_serving": 0,
+        "cart_cost": 0, 
+        "nutrition_grade": None, 
+        "instructions": ""
+    }
+
+    recipe_id = db.insert_recipe(initial_values, ingredient_id)
+    return recipe_id 
+
+'''
+Get the ingredient ID 
+UI| On the add ingredient page the user clicks add ingredient. 
+'''
+def ingredientID(ingredient_obj: Any) -> int: 
+    '''
+    Checks if the ingredient is already in the Ingredient Table. 
+    If so, return its ID 
+    Else, insert the ingredient into the db and return the new ID 
+    '''
+
+    # Check for the ingredient in db 
+    existing = db.fetch_one( 
+        "SELECT ingredient_ID FROM Ingredient WHERE ingredient_name = %s",
+        (ingredient_obj.name,)
+
+    )
+
+    if existing: 
+        return existing["ingredient_ID"]
+    
+    # Insert the new ingredient if needed 
+
+    data = ingredient_obj.to_dict()
+    new_id = db.insert("Ingredient", data)
+    return new_id 
+
+'''
+Below functions are needed for the to addIngredientToRecipe
+ScaleIngredientFunction 
+addConnectionBetweenIngredientAndRecipe
+
+'''
+
+'''
+Scales ingredient based on a given quantity 
+Takes ingredient dict scales 
+
+'''
+def scaleIngredientFunction(ingredient_dict: Dict[str, Any], quantity: float) -> Dict[str, Any]: 
+    '''
+    Returns a new dictionary containing nutrient values scaled by quantity. 
+    Ex. 
+        calories_og = 10 
+        quantity = 2 
+        calories * quantity = 20 
+    '''
+    scaled = ingredient_dict.copy() 
+
+    for nutrient in NUTRIENT_FIELDS:
+        if nutrient in ingredient_dict and ingredient_dict[nutrient] is not None:
+            scaled[nutrient] = float(ingredient_dict[nutrient]) * quantity
+    return scaled 
+
+
+''' 
+Creates RecipeIngredient table and initializes it with given paramenters 
+'''
+
+def addConnectionBetweenIngredientAndRecipe(recipe_id: int, ingredient_id: int, quantity: float) -> None:
+    '''
+    
+    '''
+    ingredient = db.fetch_one(
+        "SELECT quantity_unit FROM ingredient WHERE ingredient_ID = %s",
+        (ingredient_id,)
+    )
+
+    
+    db.insert("RecipeIngredient", {
+        "recipe_ID": recipe_id,
+        "ingredient_ID": ingredient_id,
+        "quantity": quantity,
+        "quantity_unit": ingredient["quantity_unit"]
+    })
+
+'''
+Adds ingredient to recipe and makes connection between 
+ingredient and the recipe and creates the recipeIngredient table 
+'''
+def addIngredientToRecipe(recipe_id: int, ingredient_id: int, quantity: float): 
+    '''
+    Connects and ingredient to a recipe by creating a
+    recipeIngredient table. 
+    Takes the recipe_id and ingredient id 
+
+    Scales Ingredient 
+    Updates 
+
+    1. Pulls ingredient from db, creating a copy of ingredient 
+    and the nutritional fields based on the quantity paramter 
+    2. Add ingredient's nutritional values to recipe's existing values in the recipe database 
+    3. Add the recipeIngredient connection row 
+    4. pdate the ingredient count in the recipeIngredient db 
+    '''
+
+    # Step 1: Get ingredient from DB and scale a copy of it 
+
+    ing = db.fetch_one( 
+        "SELECT * FROM Ingredient WHERE ingredient_ID = %s", 
+        (ingredient_id,)
+    )
+
+    
+    if not ing: 
+        raise ValueError("Ingredient not found in database")
+    
+    scaled = scaleIngredientFunction(ing, quantity) 
+
+
+    # Step 2: Add ingredient's nutritional values to recipe's existing values in the recipe database 
+    nutrient_updates = {field: scaled[field] for field in NUTRIENT_FIELDS}
+
+    db.update_increment("Recipe", "recipe_ID", recipe_id, {"num_ingredients": 1})
+
+
+    # Step 3: Add the recipeIngredient connection row 
+    
+    addConnectionBetweenIngredientAndRecipe(recipe_id, ingredient_id, quantity)
+
+    # Step 4: Update the ingredient count in the recipeIngredient db 
+
+    db.update_increment(
+        "Recipe",
+        "recipe,ID",
+        recipe_id,
+        {"num_ingredients": 1}
+    )
