@@ -446,7 +446,7 @@ def ingredientID(ingredient_obj: Any) -> int:
     
     # Insert the new ingredient if needed 
 
-    data = ingredient_obj.to_dict()
+    data = ingredient_obj
     new_id = db.insert("Ingredient", data)
     return new_id 
 
@@ -515,8 +515,9 @@ def addIngredientToRecipe(recipe_id: int, ingredient_id: int, quantity: float):
     1. Pulls ingredient from db, creating a copy of ingredient 
     and the nutritional fields based on the quantity paramter 
     2. Add ingredient's nutritional values to recipe's existing values in the recipe database 
-    3. Add the recipeIngredient connection row 
-    4. pdate the ingredient count in the recipeIngredient db 
+    3. Update the ingredient count in the recipeIngredient db 
+    4. Add the recipeIngredient connection row 
+    5. Use Kevin's future code 
     '''
 
     # Step 1: Get ingredient from DB and scale a copy of it 
@@ -535,19 +536,22 @@ def addIngredientToRecipe(recipe_id: int, ingredient_id: int, quantity: float):
 
     # Step 2: Add ingredient's nutritional values to recipe's existing values in the recipe database 
     nutrient_updates = {field: scaled[field] for field in NUTRIENT_FIELDS}
-
+    db.update_increment("Recipe", "recipe_ID", recipe_id, nutrient_updates) 
+    
+    
+    # Step 3: Update the ingredient count in the recipeIngredient db 
     db.update_increment("Recipe", "recipe_ID", recipe_id, {"num_ingredients": 1})
 
 
-    # Step 3: Add the recipeIngredient connection row 
+    # Step 4: Add the recipeIngredient connection row 
     
     addConnectionBetweenIngredientAndRecipe(recipe_id, ingredient_id, quantity)
+    
+    
+    ''' 
+    Step 5: We will later use Kevin's function to take a recipe have it's nutrtional 
+    values evaluted. His function returns a string that we will then store in the 
+    recipe db. The string is a letter representing the grade of the food 
+    '''
 
-    # Step 4: Update the ingredient count in the recipeIngredient db 
-
-    db.update_increment(
-        "Recipe",
-        "recipe,ID",
-        recipe_id,
-        {"num_ingredients": 1}
-    )
+    # Step 6: 
