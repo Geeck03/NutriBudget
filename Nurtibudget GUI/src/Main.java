@@ -118,7 +118,7 @@ public class Main {
         cardPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         cardPanel.add(new Page1(), "Page1");
-        cardPanel.add(new Page2(), "Page2");
+        cardPanel.add(new Page2(json -> {}, false), "Page2");
         cardPanel.add(new Page3(), "Page3");
         cardPanel.add(new Page4(), "Page4");
 

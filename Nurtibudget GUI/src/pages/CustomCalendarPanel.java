@@ -15,19 +15,9 @@ import java.util.Locale;
 
 import org.json.*;
 
-/*
-Overview:
-- Calendar UI: month + weekly views, integrates with inventory batches and meal plans.
-- Batch labels use batch date (MM/dd) and an index suffix if multiple batches share the same date/recipe.
-- Weekly waste calculations only consider batches whose dateMade falls inside the viewed week, and count
-  assignments for each batch only within that same week.
-- Adds "Refresh week" button that validates and repairs the current week: remaps missing inventory IDs,
-  creates new batches when needed, persists inventory and meal plans, and refreshes the weekly view.
-*/
+import static pages.InventoryDialog.loadImageIconStatic;
 
-//======================================================================================================================
-// Imports & Top-level DTOs
-//======================================================================================================================
+
 
 public class CustomCalendarPanel extends JPanel {
 
@@ -39,11 +29,9 @@ public class CustomCalendarPanel extends JPanel {
     private static final DateTimeFormatter HEADER_WEEK_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault());
     private static final String MEAL_PLAN_FILE = "src/pages/text/meal_plans.txt";
     private static final String INVENTORY_FILE = "src/pages/text/inventory.json";
-
     private static final Color COLOR_TODAY = new Color(173, 216, 230);
-    private static final Color COLOR_HAS_MEALS = new Color(144, 238, 144);
-    private static final Color COLOR_EXPIRE_BADGE = new Color(255, 204, 102);
-
+    private static final Color COLOR_HAS_MEALS = new Color(140, 248, 140);
+    private static final Color COLOR_EXPIRE_BADGE = new Color(245, 181, 52);
     private JLabel monthYearLabel;
     private JPanel calendarPanel;
     private LocalDate currentDate;
@@ -57,7 +45,7 @@ public class CustomCalendarPanel extends JPanel {
     private JButton viewToggleButton;
 
     //==============================================================================================================
-    // Simple DTOs
+    // DTOs
     //==============================================================================================================
     private static class PlannedMeal {
         Page4.Recipe recipe;
@@ -108,20 +96,18 @@ public class CustomCalendarPanel extends JPanel {
     }
 
     //==============================================================================================================
-    // Constructor & Initialization
+    // Constructor & init
     //==============================================================================================================
     public CustomCalendarPanel() {
         setLayout(new BorderLayout());
         currentDate = LocalDate.now();
         currentWeekStart = currentDate.with(DayOfWeek.SUNDAY);
-
         JPanel headerPanel = new JPanel(new BorderLayout());
         JPanel navPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         navPrevButton = new JButton("<");
         navNextButton = new JButton(">");
         monthYearLabel = new JLabel("", SwingConstants.CENTER);
         monthYearLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
-
         viewToggleButton = new JButton("Weekly View");
         JButton inventoryButton = new JButton("Inventory");
         JCheckBox showBatchesToggle = new JCheckBox("Show batch labels");
@@ -199,14 +185,14 @@ public class CustomCalendarPanel extends JPanel {
     }
 
     //==============================================================================================================
-    // Small UI Helpers
+    // Small UI helpers
     //==============================================================================================================
     private JPanel buildLegendPanel() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 6));
         p.setOpaque(false);
         p.add(labelForColor(COLOR_TODAY, "Today"));
         p.add(labelForColor(COLOR_HAS_MEALS, "Has meals"));
-        p.add(labelForColor(COLOR_EXPIRE_BADGE, "Expiring soon (badge)"));
+        p.add(labelForColor(COLOR_EXPIRE_BADGE, "Expiring soon"));
         JButton info = new JButton("How it works");
         info.addActionListener(e -> showHowItWorksDialog());
         p.add(info);
@@ -247,7 +233,7 @@ public class CustomCalendarPanel extends JPanel {
     }
 
     //==============================================================================================================
-    // Month Rendering
+    // Month rendering
     //==============================================================================================================
     private void refreshCalendar() {
         isWeeklyView = false;
@@ -367,6 +353,7 @@ public class CustomCalendarPanel extends JPanel {
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
         JScrollPane scrollPane = new JScrollPane(contentPanel);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+
 
         LocalDate date = LocalDate.parse(dateStr, DATE_FORMAT);
 
@@ -635,7 +622,7 @@ public class CustomCalendarPanel extends JPanel {
 
         main.add(weeklyHeader, BorderLayout.NORTH);
 
-        // week grid & sidebar (unchanged layout)...
+
         JPanel weekGrid = new JPanel(new GridLayout(1, 7, 6, 6));
         weekGrid.setBorder(new EmptyBorder(10, 10, 10, 10));
 
@@ -762,7 +749,7 @@ public class CustomCalendarPanel extends JPanel {
         LocalDate weekEnd = weekStart.plusDays(6);
         try {
             JSONArray invArr = readInventoryArray();
-            // create a mutable list of InventoryEntry from invArr for in-memory search
+
             List<InventoryEntry> currentInv = new ArrayList<>();
             for (int i = 0; i < invArr.length(); i++) currentInv.add(InventoryEntry.fromJson(invArr.getJSONObject(i)));
 
@@ -786,7 +773,7 @@ public class CustomCalendarPanel extends JPanel {
                             remapped++;
                             continue;
                         }
-                        // not found -> create a new batch for this recipe on this date and append
+
                         InventoryEntry newBatch = createBatchForPlannedMeal(pm, d);
                         invArr.put(newBatch.toJson());
                         currentInv.add(newBatch);
@@ -796,7 +783,7 @@ public class CustomCalendarPanel extends JPanel {
                 }
             }
 
-            // persist inventory (if any new entries were appended)
+
             writeInventoryArray(invArr);
 
             // persist meal_plans
@@ -824,10 +811,9 @@ public class CustomCalendarPanel extends JPanel {
         }
     }
 
-    // find candidate batch: same recipe name, same date (exact) and with remaining portions; if none, allow any in-week
     private InventoryEntry findCandidateBatchForDate(List<InventoryEntry> invList, String recipeName, LocalDate date) {
         if (recipeName == null) return null;
-        // exact date first
+
         for (InventoryEntry ie : invList) {
             if (ie.name.equalsIgnoreCase(recipeName) && ie.dateMade.equals(date)) {
                 int assigned = countAssignmentsOfInventoryInRange(ie.id, date, date);
@@ -835,7 +821,7 @@ public class CustomCalendarPanel extends JPanel {
                 if (remaining > 0) return ie;
             }
         }
-        // allow same-week other days
+
         LocalDate weekStart = date.with(DayOfWeek.SUNDAY);
         LocalDate weekEnd = weekStart.plusDays(6);
         for (InventoryEntry ie : invList) {
@@ -848,7 +834,7 @@ public class CustomCalendarPanel extends JPanel {
         return null;
     }
 
-    // create a new inventory batch for a planned meal on targetDate
+
     private InventoryEntry createBatchForPlannedMeal(PlannedMeal pm, LocalDate targetDate) {
         InventoryEntry newIe = new InventoryEntry();
         newIe.id = UUID.randomUUID().toString();
@@ -1373,55 +1359,43 @@ public class CustomCalendarPanel extends JPanel {
     }
 
     //==============================================================================================================
-    // Recipe helpers & misc
+    // Recipe helpers & misc (UPDATED to use RecipeLoader and dedupe)
     //==============================================================================================================
     private Page4.Recipe findRecipeByName(String name) {
-        List<Page4.Recipe> all = new ArrayList<>();
-        all.addAll(loadRecipesFromFile("src/pages/text/recipes.txt"));
-        all.addAll(loadRecipesFromFile("src/pages/text/custom_recipes.txt"));
-        for (Page4.Recipe r : all) {
-            if (r.recipe_name.equalsIgnoreCase(name)) return r;
+        if (name == null || name.trim().isEmpty()) return null;
+        String want = RecipeLoader.normalizeName(name);
+        if (want.isEmpty()) return null;
+        // Search merged list so packaged + custom are both considered
+        for (Page4.Recipe r : loadAllRecipes()) {
+            String rn = r.recipe_name == null ? "" : RecipeLoader.normalizeName(r.recipe_name);
+            if (rn.equals(want)) return r;
         }
         return null;
     }
 
     private Page4.Recipe findRecipeByPartialName(String namePart) {
-        List<Page4.Recipe> all = loadAllRecipes();
-        String n = namePart.toLowerCase();
-        for (Page4.Recipe r : all) {
-            if (r.recipe_name.toLowerCase().contains(n)) return r;
+        if (namePart == null || namePart.trim().isEmpty()) return null;
+        String want = RecipeLoader.normalizeName(namePart);
+        for (Page4.Recipe r : loadAllRecipes()) {
+            String rn = r.recipe_name == null ? "" : RecipeLoader.normalizeName(r.recipe_name);
+            if (rn.contains(want)) return r;
         }
         return null;
     }
 
     private List<Page4.Recipe> loadAllRecipes() {
-        List<Page4.Recipe> allRecipes = new ArrayList<>();
-        allRecipes.addAll(loadRecipesFromFile("src/pages/text/custom_recipes.txt"));
-        allRecipes.addAll(loadRecipesFromFile("src/pages/text/recipes.txt"));
-        return allRecipes;
+
+        LinkedHashMap<String, Page4.Recipe> byName = new LinkedHashMap<>();
+        for (Page4.Recipe r : RecipeLoader.loadRecipesFromFile("src/pages/text/recipes.txt")) {
+            if (r.recipe_name != null) byName.put(r.recipe_name.trim().toLowerCase(), r);
+        }
+        for (Page4.Recipe r : RecipeLoader.loadRecipesFromFile("src/pages/text/custom_recipes.txt")) {
+            if (r.recipe_name != null) byName.put(r.recipe_name.trim().toLowerCase(), r);
+        }
+        return new ArrayList<>(byName.values());
     }
 
-    private List<Page4.Recipe> loadRecipesFromFile(String path) {
-        Page4 temp = new Page4();
-        return temp.loadRecipes(path);
-    }
-
-    private static ImageIcon loadImageIconStatic(String path, int width, int height) {
-        if (path == null || path.isEmpty()) return null;
-        File f = new File(path);
-        if (!f.exists()) return null;
-        ImageIcon icon = new ImageIcon(f.getAbsolutePath());
-        Image img = icon.getImage();
-        return new ImageIcon(img.getScaledInstance(width, height, Image.SCALE_SMOOTH));
-    }
-
-    private int getTotalPortionsOrDefault(Page4.Recipe r) {
-        try { return r.total_portions; } catch (Exception ex) { return 1; }
-    }
-    private int getEdibleDaysOrDefault(Page4.Recipe r) {
-        try { return r.edible_days; } catch (Exception ex) { return 3; }
-    }
-
+    // Keep the existing createPlaceholderRecipe / other helpers intact below
     private Page4.Recipe createPlaceholderRecipe(String recipeName) {
         return new Page4.Recipe(
                 0,
@@ -1441,5 +1415,11 @@ public class CustomCalendarPanel extends JPanel {
     private String escapeHtml(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>");
+    }
+    private int getTotalPortionsOrDefault(Page4.Recipe r) {
+        try { return r.total_portions; } catch (Exception ex) { return 1; }
+    }
+    private int getEdibleDaysOrDefault(Page4.Recipe r) {
+        try { return r.edible_days; } catch (Exception ex) { return 3; }
     }
 }

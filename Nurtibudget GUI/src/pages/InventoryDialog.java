@@ -14,15 +14,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 
-/*
-Overview:
-- Inventory editor dialog: add/edit/remove/clear inventory batches.
-- Calls provided refresh callback after changes so calendar reloads updated data.
-- Important change/fix: do NOT force portionsUsed to include planned assignments when loading inventory.
-  portionsUsed represents manual/actual used portions. Assignments from meal_plans are counted separately
-  when computing remaining portions. If there are more assignments than available portions, the dialog will
-  warn about over-assigned batches so the user can fix them.
-*/
 
 //======================================================================================================================
 // InventoryDialog: fields & construction
@@ -468,16 +459,23 @@ public class InventoryDialog extends JDialog {
     }
 
     private List<Page4.Recipe> loadAllRecipes() {
-        List<Page4.Recipe> all = new ArrayList<>();
+        LinkedHashMap<String, Page4.Recipe> byName = new LinkedHashMap<>();
         try {
-            Page4 p = new Page4();
-            all.addAll(p.loadRecipes("src/pages/text/custom_recipes.txt"));
-            all.addAll(p.loadRecipes("src/pages/text/recipes.txt"));
-        } catch (Exception ex) { ex.printStackTrace(); }
-        return all;
+            for (Page4.Recipe r : RecipeLoader.loadRecipesFromFile("src/pages/text/recipes.txt")) {
+                if (r != null && r.recipe_name != null) byName.put(r.recipe_name.trim().toLowerCase(), r);
+            }
+            for (Page4.Recipe r : RecipeLoader.loadRecipesFromFile("src/pages/text/custom_recipes.txt")) {
+                if (r != null && r.recipe_name != null) byName.put(r.recipe_name.trim().toLowerCase(), r);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        List<Page4.Recipe> merged = new ArrayList<>(byName.values());
+        System.out.println("InventoryDialog: loaded recipes - merged=" + merged.size());
+        return merged;
     }
 
-    private static ImageIcon loadImageIconStatic(String path, int width, int height) {
+    static ImageIcon loadImageIconStatic(String path, int width, int height) {
         if (path == null || path.isEmpty()) return null;
         File f = new File(path);
         if (!f.exists()) return null;
