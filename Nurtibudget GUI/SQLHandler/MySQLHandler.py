@@ -678,3 +678,44 @@ class MySQLHandler:
             (recipe_id,)
         )
         return row[column] if row is not None else None
+    
+    
+    def update_increment(self, table, key_col, key_val, increments: dict): 
+        '''
+        This function increments values in a database row if the the given 
+        row is numeric 
+    
+        Ex. Increments = {"calories": 20, "carbs": 2} 
+        This will become 
+            calories = calories + 20 # Update the calories row add 20 
+            carbs = carbs + 2 # Update the carbs row add 2 
+    
+        '''
+        # Check if there is connection if not reconnect 
+        if not self.connection: 
+            self._reconnect()
+
+        
+    # Create query 
+    # Ex. {"calories": 20, "carbs": 2}
+    # set_clauses generates: 
+    # "calories = calories + %s, carbs = carbs + %s"
+    # %s is place holder value for values 
+        set_clauses = ", ".join([f"{col} = {col} + %s" for col in increments.keys()])
+    
+    # Values creates a list of the values to be used by execute 
+    # order of values must match the set_clause
+        values = list(increments.values()) + [key_val]
+    
+    # Finish crafting the query 
+        query = f"UPDATE {table} SET {set_clauses} WHERE {key_col} = %s" 
+    
+        try: 
+        # Send command to SQL to inject values 
+            self.execute_query(query, values)
+        # Commit changes 
+            self.connection.commit()
+            print(f"[Success] Incremented values in '{table}'.")
+        except Exception as e: 
+            print("[ERROR] Failed to increment", e)
+            raise 

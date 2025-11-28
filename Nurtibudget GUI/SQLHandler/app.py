@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 import os
-
+import math 
 import requests # Library for making HTTP requests
 import base64 # Library for encoding/decoding data in Base64 format
 
@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from typing import List
 import json
 from typing import List, Optional, Dict, Any
-
 from ingredient import Ingredient 
 from ingredient import nutrientInfo
 from MySQLHandler import MySQLHandler   # Your DB wrapper
@@ -64,6 +63,10 @@ def addIngredientToRecipe(recipe_id: int, ingredient_id: int, quantity: float):
     Calls: 
     def ScaleIngredientFunction(ingredient_dict: Dict[str, Any], quantity: float) -> Dict[str, Any]:
     def ingredientID(ingredient_obj: Any) -> int:
+    
+def UpdateCostPerServing(recipe_id: int): 
+    Helper to add Ingredient 
+    Upates the cost per serving when addIngredientToRecipe is called  
     
 
 '''
@@ -436,7 +439,7 @@ def ingredientID(ingredient_obj: Any) -> int:
 
     # Check for the ingredient in db 
     existing = db.fetch_one( 
-        "SELECT ingredient_ID FROM Ingredient WHERE ingredient_name = %s",
+        "SELECT ingredient_ID FROM Ingredients WHERE ingredient_name = %s",
         (ingredient_obj.name,)
 
     )
@@ -447,7 +450,7 @@ def ingredientID(ingredient_obj: Any) -> int:
     # Insert the new ingredient if needed 
 
     data = ingredient_obj
-    new_id = db.insert("Ingredient", data)
+    new_id = db.insert_ingredients("Ingredients", data)
     return new_id 
 
 '''
@@ -460,8 +463,8 @@ addConnectionBetweenIngredientAndRecipe
 '''
 Scales ingredient based on a given quantity 
 Takes ingredient dict scales 
-
 '''
+
 def scaleIngredientFunction(ingredient_dict: Dict[str, Any], quantity: float) -> Dict[str, Any]: 
     '''
     Returns a new dictionary containing nutrient values scaled by quantity. 
@@ -487,7 +490,7 @@ def addConnectionBetweenIngredientAndRecipe(recipe_id: int, ingredient_id: int, 
     
     '''
     ingredient = db.fetch_one(
-        "SELECT quantity_unit FROM ingredient WHERE ingredient_ID = %s",
+        "SELECT quantity_unit FROM Ingredients WHERE ingredient_ID = %s",
         (ingredient_id,)
     )
 
@@ -517,30 +520,30 @@ def addIngredientToRecipe(recipe_id: int, ingredient_id: int, quantity: float):
     2. Add ingredient's nutritional values to recipe's existing values in the recipe database 
     3. Update the ingredient count in the recipeIngredient db 
     4. Add the recipeIngredient connection row 
-    5. Use Kevin's future code 
+    5. Use Kevin's future code to grab code 
+    6. Update price values 
     '''
 
     # Step 1: Get ingredient from DB and scale a copy of it 
 
     ing = db.fetch_one( 
-        "SELECT * FROM Ingredient WHERE ingredient_ID = %s", 
+        "SELECT * FROM Ingredients WHERE ingredient_ID = %s", 
         (ingredient_id,)
     )
-
     
     if not ing: 
         raise ValueError("Ingredient not found in database")
     
+    
     scaled = scaleIngredientFunction(ing, quantity) 
-
 
     # Step 2: Add ingredient's nutritional values to recipe's existing values in the recipe database 
     nutrient_updates = {field: scaled[field] for field in NUTRIENT_FIELDS}
-    db.update_increment("Recipe", "recipe_ID", recipe_id, nutrient_updates) 
+    db.update_increment("Recipes", "recipe_ID", recipe_id, nutrient_updates) 
     
     
     # Step 3: Update the ingredient count in the recipeIngredient db 
-    db.update_increment("Recipe", "recipe_ID", recipe_id, {"num_ingredients": 1})
+    db.update_increment("Recipes", "recipe_ID", recipe_id, {"num_ingredients": 1})
 
 
     # Step 4: Add the recipeIngredient connection row 
@@ -554,4 +557,63 @@ def addIngredientToRecipe(recipe_id: int, ingredient_id: int, quantity: float):
     recipe db. The string is a letter representing the grade of the food 
     '''
 
-    # Step 6: 
+    # Step 6: Update price values 
+    
+    recipe = db.fetch_one( 
+        "SELECT * FROM Recipes WHERE recipe_ID = %s", 
+        (recipe_id,)
+    )
+    
+    if not recipe: 
+        raise ValueError("Ingredient not found in database")
+    
+    # promo 
+    promo = ing["promo"]
+    ingredient_cost = promo * quantity # cost of ingredient 
+    cart_cost = math.ceil(ingredient_cost)
+    
+    # Call update cost per serving 
+    UpdateCostPerServing(recipe_id) # Call UpdateCostPerServing function 
+    
+    db.update_increment("Recipes", "recipe_ID", recipe_id, {"ingredient_cost_sum": ingredient_cost})
+    db.update_increment("Recipes", "recipe_ID", recipe_id, {"cart_cost": cart_cost})
+'''
+Updates the cost per serving
+
+'''
+def UpdateCostPerServing(recipe_id: int): 
+    
+    
+    recipe = db.fetch_one( 
+        "SELECT * FROM Recipes WHERE recipe_ID = %s", 
+        (recipe_id,)
+    )
+    
+    if not recipe: 
+        raise ValueError("Ingredient not found in database")
+    
+    
+    query = """
+    SELECT serving_size
+    FROM recipes
+    WHERE recipe_ID = %s AND serving_size IS NOT NULL AND serving_size <> 0;
+    """
+
+    result = db.fetch_one(query, (recipe_id,))
+
+    if result:
+        serving_size = result[0]
+        
+        
+    else:
+        serving_size = None
+
+    query = """
+        UPDATE recipes
+        SET cost_per_serving = %s
+        WHERE recipe_ID = %s;
+    """
+    
+    ingredient_cost_sum = recipe["ingredient_cost_sum"]        
+    new_cost_per_serving = ingredient_cost_sum / serving_size # calculate 
+    db.execute_query(query, (new_cost_per_serving, recipe_id))
