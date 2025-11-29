@@ -13,10 +13,14 @@ import java.util.List;
 import java.util.Base64;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.CompletableFuture;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+
 import bridge.IKrogerWrapper;
 import bridge.Py4JHelper;
+import bridge.PyBridgeInvoker;
 
 public class Page4 extends JPanel {
 
@@ -142,6 +146,9 @@ public class Page4 extends JPanel {
 
         public double multiplier = 1.0;
 
+        // Last quantity synced to Python for addIngredientToRecipe calls.
+        public double lastSyncedQuantity = Double.NaN;
+
         public IngredientEntry() {}
 
         public JSONObject toJson() {
@@ -158,8 +165,11 @@ public class Page4 extends JPanel {
             o.put("multiplier", multiplier);
             o.put("nutrients_per_serving", nutrients_per_serving != null ? nutrients_per_serving : JSONObject.NULL);
             o.put("kroger_raw", kroger_raw != null ? kroger_raw : JSONObject.NULL);
+            if (!Double.isNaN(lastSyncedQuantity)) o.put("lastSyncedQuantity", lastSyncedQuantity);
             return o;
         }
+
+
 
         public static IngredientEntry fromJson(JSONObject o) {
             IngredientEntry ie = new IngredientEntry();
@@ -175,6 +185,7 @@ public class Page4 extends JPanel {
             ie.multiplier = o.optDouble("multiplier", 1.0);
             if (o.has("nutrients_per_serving") && !o.isNull("nutrients_per_serving")) ie.nutrients_per_serving = o.optJSONObject("nutrients_per_serving");
             if (o.has("kroger_raw") && !o.isNull("kroger_raw")) ie.kroger_raw = o.optJSONObject("kroger_raw");
+            if (o.has("lastSyncedQuantity")) ie.lastSyncedQuantity = o.optDouble("lastSyncedQuantity", Double.NaN);
             return ie;
         }
     }
@@ -205,21 +216,36 @@ public class Page4 extends JPanel {
         buildUI();
     }
 
-
     private void autoSaveActiveRecipe() {
         if (suppressDocumentEvents) return;
         if (activeRecipe == null) return;
-        try {
-            ingredientTableModel.commitEdits();
-        } catch (Exception ignored) {}
+        try { ingredientTableModel.commitEdits(); } catch (Exception ignored) {}
         activeRecipe.recipe_ingredients = ingredientTableModel.getIngredients();
         activeRecipe.total_portions = ((Number) totalPortionsSpinner.getValue()).intValue();
         activeRecipe.edible_days = ((Number) edibleDaysSpinner.getValue()).intValue();
         recomputeAndStore(activeRecipe);
         saveRecipes(CUSTOM_RECIPE_FILE);
         refreshRecipeListModel();
-    }
 
+        // --- NEW: sync ingredient->recipe links to Python ---
+        if (activeRecipe.recipe_ID > 0) {
+            int recipeId = activeRecipe.recipe_ID;
+            for (IngredientEntry ie : activeRecipe.recipe_ingredients) {
+                if (ie.external_id == null || ie.external_id.isEmpty()) continue;
+                int ingId;
+                try { ingId = Integer.parseInt(ie.external_id); }
+                catch (Exception ex) { continue; } // skip non-numeric external_id
+                double q = ie.quantity;
+                double last = ie.lastSyncedQuantity;
+                boolean needsSync = Double.isNaN(last) || Double.compare(q, last) != 0;
+                if (needsSync) {
+                    PyBridgeInvoker.addIngredientToRecipe(recipeId, ingId, q);
+                    ie.lastSyncedQuantity = q;
+                }
+            }
+            try { saveRecipes(CUSTOM_RECIPE_FILE); } catch (Exception ignored) {}
+        }
+    }
 
     private void markDirty() { autoSaveActiveRecipe(); }
     private void markClean() {}
@@ -259,7 +285,6 @@ public class Page4 extends JPanel {
         meta.add(new JLabel("Recipe name:"), c);
         c.gridx = 1; c.gridy = 0; c.gridwidth = 3;
         meta.add(nameField, c);
-
 
         c.gridx = 0; c.gridy = 1; c.gridwidth = 1;
         meta.add(new JLabel("Total portions:"), c);
@@ -312,7 +337,6 @@ public class Page4 extends JPanel {
         split.setDividerLocation(260);
         add(split, BorderLayout.CENTER);
 
-
         newBtn.addActionListener(e -> {
             if (!confirmSaveIfDirty()) return;
             String baseName = "New recipe";
@@ -328,12 +352,32 @@ public class Page4 extends JPanel {
                 input = makeUniqueName(input);
                 break;
             }
+            // create local recipe immediately for responsive UI
             Recipe r = new Recipe(nextId(), input);
             recipes.add(r);
             refreshRecipeListModel();
             selectRecipe(r);
-            // autosave new recipe
+            // autosave new recipe locally
             autoSaveActiveRecipe();
+
+
+
+            //PYTHON STUFF
+            // Call Python createRecipe asynchronously and update recipe_ID with returned id if valid
+            CompletableFuture<Integer> fut = PyBridgeInvoker.createRecipe(input);
+            String finalInput = input;
+            fut.thenAccept(pyId -> {
+                if (pyId != null && pyId > 0) {
+                    SwingUtilities.invokeLater(() -> {
+                        r.recipe_ID = pyId;
+                        recomputeAndStore(r);
+                        saveRecipes(CUSTOM_RECIPE_FILE);
+                        refreshRecipeListModel();
+                    });
+                } else {
+                    System.err.println("Python createRecipe returned invalid id for recipe '" + finalInput + "'");
+                }
+            });
         });
 
         deleteBtn.addActionListener(e -> {
@@ -346,7 +390,6 @@ public class Page4 extends JPanel {
                 clearEditor(nameField, descArea);
             }
         });
-
 
         recipeJList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -393,7 +436,6 @@ public class Page4 extends JPanel {
             public void changedUpdate(DocumentEvent e) { update(); }
         });
 
-        //autosave
         totalPortionsSpinner.addChangeListener(e -> { if (!suppressDocumentEvents) markDirty(); });
         edibleDaysSpinner.addChangeListener(e -> { if (!suppressDocumentEvents) markDirty(); });
 
@@ -452,6 +494,36 @@ public class Page4 extends JPanel {
                     ingredientTableModel.setIngredients(activeRecipe.recipe_ingredients);
                     updateTotals();
                     markDirty(); // autosave
+
+
+
+                    // PYTHON STUFF
+                    // then notify Python the ingredient was added to the recipe.
+                    CompletableFuture<Integer> createFut = PyBridgeInvoker.createIngredient(ie.toJson().toString());
+                    createFut.thenAccept(ingId -> {
+                        if (ingId != null && ingId > 0) {
+                            SwingUtilities.invokeLater(() -> {
+                                ie.external_id = String.valueOf(ingId);
+                                ie.lastSyncedQuantity = ie.quantity; // mark synced
+                                recomputeAndStore(activeRecipe);
+                                saveRecipes(CUSTOM_RECIPE_FILE);
+                                refreshRecipeListModel();
+                            });
+                        } else {
+                            System.err.println("Python ingredientID returned invalid id for ingredient '" + ie.name + "'");
+                        }
+                        // Always notify and ask Python to link (fire-and-forget)
+                        try {
+                            // only call addIngredientToRecipe if recipe has server-side id and parsed ingId > 0
+                            int recipeId = activeRecipe != null ? activeRecipe.recipe_ID : -1;
+                            if (recipeId > 0 && ingId != null && ingId > 0) {
+                                PyBridgeInvoker.addIngredientToRecipe(recipeId, ingId, ie.quantity);
+                            }
+                            PyBridgeInvoker.notifyRecipeAddedIngredient(activeRecipe.toJson().toString(), ie.toJson().toString());
+                        } catch (Throwable t) {
+                            System.err.println("Failed to notify Python of added ingredient: " + t.getMessage());
+                        }
+                    });
                 }
             });
             dlg.setVisible(true);
@@ -654,6 +726,34 @@ public class Page4 extends JPanel {
                 ingredientTableModel.setIngredients(activeRecipe.recipe_ingredients);
                 updateTotals();
                 markDirty(); // autosave
+
+                // PYTHON STUFF
+                // then notify Python the ingredient was added to the recipe.
+                CompletableFuture<Integer> createFut = PyBridgeInvoker.createIngredient(ie.toJson().toString());
+                createFut.thenAccept(ingId -> {
+                    if (ingId != null && ingId > 0) {
+                        SwingUtilities.invokeLater(() -> {
+                            ie.external_id = String.valueOf(ingId);
+                            ie.lastSyncedQuantity = ie.quantity; // mark as synced
+                            recomputeAndStore(activeRecipe);
+                            saveRecipes(CUSTOM_RECIPE_FILE);
+                            refreshRecipeListModel();
+                        });
+                    } else {
+                        System.err.println("Python ingredientID returned invalid id for ingredient '" + ie.name + "'");
+                    }
+                    // Always notify and ask Python to link (fire-and-forget)
+                    try {
+                        // only call addIngredientToRecipe if recipe has server-side id and parsed ingId > 0
+                        int recipeId = activeRecipe != null ? activeRecipe.recipe_ID : -1;
+                        if (recipeId > 0 && ingId != null && ingId > 0) {
+                            PyBridgeInvoker.addIngredientToRecipe(recipeId, ingId, ie.quantity);
+                        }
+                        PyBridgeInvoker.notifyRecipeAddedIngredient(activeRecipe.toJson().toString(), ie.toJson().toString());
+                    } catch (Throwable t) {
+                        System.err.println("Failed to notify Python of added ingredient: " + t.getMessage());
+                    }
+                });
             }
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -1012,7 +1112,6 @@ public class Page4 extends JPanel {
         });
     }
 
-
     private void editIngredientAmounts() {
         int row = ingredientTable.getSelectedRow();
         if (row >= 0) {
@@ -1070,7 +1169,6 @@ public class Page4 extends JPanel {
         }
         public Object getCellEditorValue() { return spinner.getValue(); }
     }
-
 
     private String makeUniqueName(String base) {
         if (base == null) base = "Recipe";
