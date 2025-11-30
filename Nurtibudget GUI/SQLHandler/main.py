@@ -14,10 +14,9 @@ class KrogerWrapper:
         print("✅ KrogerWrapper initialized using real Kroger API logic.")
 
     def search(self, query, limit):
-        print(f"🔍 Python received: query='{query}', limit={limit}")
+        print(f"🔍 Python received query='{query}', limit={limit}")
 
         if not query.strip():
-            print("Empty search query received; returning empty list")
             return json.dumps([])
 
         try:
@@ -26,11 +25,11 @@ class KrogerWrapper:
 
             for ing in ingredients:
                 results.append({
-                    "id": ing.product_ID,
-                    "name": ing.name,
-                    "describe": getattr(ing, "description", "No description available"),
-                    "price": ing.local_regular if ing.local_regular else ing.national_regular,
-                    "promo_price": ing.local_promo if ing.local_promo else ing.national_promo,
+                    "id": getattr(ing, "product_ID", None),
+                    "name": getattr(ing, "name", "Unknown"),
+                    "description": getattr(ing, "description", "No description"),
+                    "price": getattr(ing, "local_regular", getattr(ing, "national_regular", 0)),
+                    "promo_price": getattr(ing, "local_promo", getattr(ing, "national_promo", 0)),
                     "image_url": getattr(ing, "image_url", ""),
                     "nutrients": getattr(ing, "sidebar_nutrients", [
                         f"Calories: {getattr(ing, 'calories', 'N/A')}",
@@ -39,20 +38,22 @@ class KrogerWrapper:
                         f"Fat: {getattr(ing, 'fat', 'N/A')}g",
                     ])
                 })
-
             return json.dumps(results, indent=2)
 
         except Exception as e:
-            error_msg = f" Error in search(): {e}"
-            print(error_msg)
+            print(f"❌ Error in search(): {e}")
             return json.dumps({"error": str(e)})
 
 # ===================== Py4J server setup =====================
 def start_py4j_server(ready_event):
     wrapper = KrogerWrapper()
-    server = ClientServer(python_server_entry_point=wrapper)
-    print("✅ Python Py4J server running on default ports...")
-    ready_event.set()
+    server = ClientServer(
+        java_parameters=JavaParameters(port=25333),
+        python_parameters=PythonParameters(port=25334),
+        python_server_entry_point=wrapper
+    )
+    print("✅ Python Py4J server running on ports 25333/25334")
+
     try:
         while True:
             time.sleep(1)
@@ -60,27 +61,14 @@ def start_py4j_server(ready_event):
         print("Py4J Server stopped.")
 
 
-
-
-def main():
+# ===================== Database Test (Optional) =====================
+def test_database():
     """
-    This is a test main method which adds Oats and Milk to the Ingredients table,
-    and the recipe Overnight Oats to the recipe table with Milk and Oats linked to it.
-
-    NOTE: As a ingregrity measure, MySQL cursor does not reset an AUTO_INCREMENTED value if a value from the table is deleted.
-    For example, if you were to run the given test main method twice, then the ingredient table would look like this:
-    1 Oats ...
-    2 Milk ...
-    3 Eggs ...
-    4 Bread ...
-    
-    Then deleting these records will not reset the cursor, so if you run the test main method again,
-    the ingredient_ID will start at 5 instead of 1.
+    Inserts sample ingredients and a recipe to verify MySQL integration.
     """
-
-    load_dotenv()  # Load environment variables from .env file
+    load_dotenv()
     host = os.getenv("host")
-    user = os.getenv ("user")
+    user = os.getenv("user")
     password = os.getenv("password")
     database = os.getenv("database")
     
@@ -185,32 +173,10 @@ def main():
     ingredient_id = db.insert_ingredient_object(apple)
     print(f"Inserted Ingredient ID: {ingredient_id}")
 
-    # Fetch data to verify
-    '''
-    print(f"\n=== Fetching Recipes ===")
-    recipes = db.fetch_all("SELECT * FROM Recipes")
-    for r in recipes:
-        print(f"- {r['recipe_ID']}: {r['recipe_name']}")
-
-    print("\n=== Fetching Linked Ingredients for 'Overnight Oats' ===")
-    linked_ingredients = db.fetch_all("""
-        SELECT R.recipe_name, I.ingredient_name, RI.quantity
-        FROM RecipeIngredients RI
-        JOIN Recipes R ON R.recipe_ID = RI.recipe_ID
-        JOIN Ingredients I ON I.ingredient_ID = RI.ingredient_ID
-        WHERE R.recipe_ID = %s
-    """(recipe_id,))
-    for li in linked_ingredients:
-        print(f"• {li['ingredient_name']} ({li['quantity']} g/mL)")
-    '''
-    # Close the connection
     db.close()
-    print(f"\n=== Database Connection Closed ===")
+    print("=== Database Connection Closed ===")
 
-
-
-
-
+# ===================== Main =====================
 if __name__ == "__main__":
     py4j_ready = threading.Event()
     py4j_thread = threading.Thread(target=start_py4j_server, args=(py4j_ready,), daemon=False)

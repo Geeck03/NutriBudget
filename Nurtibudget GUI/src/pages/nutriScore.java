@@ -2,7 +2,7 @@ package pages;
 
 import java.util.List;
 
-public class nutriScore {
+public class NutriScore {
 
     public static String gradeForRecipe(int calories, int protein, int carbs, double fat) {
         int neg = 0;
