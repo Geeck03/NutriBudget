@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 import os
 import threading
 import json
-from py4j.clientserver import ClientServer
+from py4j.clientserver import ClientServer, JavaParameters, PythonParameters
+
 import time
 
 # ===================== KrogerWrapper (unchanged) =====================
@@ -48,7 +49,7 @@ class KrogerWrapper:
 def start_py4j_server(ready_event):
     wrapper = KrogerWrapper()
     server = ClientServer(
-        java_parameters=JavaParameters(port=25333),
+        java_parameters=JavaParameters(port=25335),
         python_parameters=PythonParameters(port=25334),
         python_server_entry_point=wrapper
     )
@@ -185,7 +186,7 @@ if __name__ == "__main__":
     py4j_ready.wait()
     print("✅ Py4J server ready, running main()...")
 
-    main()
+
 
     # Keep Python alive for Java callbacks
     try:

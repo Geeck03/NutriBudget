@@ -25,7 +25,7 @@ public class Py4JHelper {
             attempted = true;
             try {
                 client = new ClientServer.ClientServerBuilder()
-                    .javaPort(0)        // any available local port
+                    .javaPort(25335)        // any available local port
                     .pythonPort(25334)  // must match Python server port
                     .build();
 
