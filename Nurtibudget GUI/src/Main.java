@@ -1,4 +1,6 @@
 import java.awt.*;
+import java.sql.Connection;
+
 import javax.swing.*;
 import bridge.IKrogerWrapper;
 import pages.*;
@@ -98,8 +100,28 @@ public class Main {
         cardPanel.add(new Page3(), "Page3");
         cardPanel.add(new Page4(), "Page4");
 
+        // --- DB connection ---
+Connection dbConnection = null;
+try {
+    String dbUrl = String.format(
+        "jdbc:mysql://%s:3306/%s",
+        System.getenv("host"),
+        System.getenv("database")
+    );
+    String dbUser = System.getenv("user");
+    String dbPassword = System.getenv("password");
+    dbConnection = java.sql.DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+
+} catch (java.sql.SQLException e) {
+    e.printStackTrace();
+}
+
         // SuggestionsPage now expects both DB connection (null for now) and IKrogerWrapper
-        cardPanel.add(new SuggestionsPage(null, krogerWrapper), "Suggestions");
+        new SuggestionsPage(dbConnection, krogerWrapper);
+        
+        SuggestionsPage suggestionsPage = new SuggestionsPage(dbConnection, krogerWrapper);
+        cardPanel.add(suggestionsPage, "Suggestions");
+
 
         cardPanel.add(new AccountInfoPage(), "AccountInfo");
 

@@ -31,7 +31,8 @@ public class Page4 extends JPanel {
         public String description;
 
         public Recipe(int recipe_ID, String recipe_name, double recipe_cos_sum, double cost_cook,
-            double cost_per_serving, double cart_cost, String nutrition_grade, List<IngredientEntry> recipe_ingredients, List<String> instructions, String description, String imagePath) {
+                      double cost_per_serving, double cart_cost, String nutrition_grade, List<IngredientEntry> recipe_ingredients,
+                      List<String> instructions, String description, String imagePath) {
             this.recipe_ID = recipe_ID;
             this.recipe_name = recipe_name;
             this.recipe_cos_sum = recipe_cos_sum;
@@ -276,9 +277,10 @@ public class Page4 extends JPanel {
 
         dialog.setVisible(true);
     }
+
     //==============================================================================================================
-// Add / Edit Recipe Dialog
-//==============================================================================================================
+    // Add / Edit Recipe Dialog
+    //==============================================================================================================
     private void openAddRecipeDialog(Recipe existing) {
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
                 existing != null ? "Edit Recipe" : "Add Recipe", true);
@@ -390,6 +392,7 @@ public class Page4 extends JPanel {
         // Add ingredient button
         JButton addIngredientBtn = new JButton("Add Ingredient");
         addIngredientBtn.addActionListener(e -> {
+            // Use the new Page2 constructor
             Page2.IngredientSelectionListener listener = json -> {
                 try {
                     String name = json.optString("name");
@@ -492,137 +495,21 @@ public class Page4 extends JPanel {
                 ex.printStackTrace();
             }
         });
-
         mainPanel.add(saveBtn);
+
         dialog.setVisible(true);
     }
 
-
-    //==============================================================================================================
-    // Load / Save Recipes
-    //==============================================================================================================
-    List<Recipe> loadRecipes(String filePath) {
-        List<Recipe> list = new ArrayList<>();
-        File f = new File(filePath);
-        if (!f.exists()) return list;
-
-        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
-            br.readLine(); // header
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (line.trim().isEmpty()) continue;
-                String[] p = line.split("\t");
-                if (p.length < 10) continue;
-                int id = safeParseInt(p[0]);
-                String name = p[1];
-                double cos_sum = safeParseDouble(p[2]);
-                double costCook = safeParseDouble(p[3]);
-                double costPer = safeParseDouble(p[4]);
-                double cart = safeParseDouble(p[5]);
-                String nutrition = p[6];
-                String desc = p[7];
-                String img = p[8];
-
-                List<IngredientEntry> ingrList = new ArrayList<>();
-                List<String> instrList = new ArrayList<>();
-
-                try {
-                    if (!p[9].isEmpty()) {
-                        String ingrJson = new String(Base64.getDecoder().decode(p[9]));
-                        JSONArray arr = new JSONArray(ingrJson);
-                        for (int i = 0; i < arr.length(); i++) {
-                            JSONObject o = arr.getJSONObject(i);
-                            IngredientEntry ie = new IngredientEntry(
-                                    o.optString("name"),
-                                    o.optDouble("quantity", 0.0),
-                                    o.optString("unit"),
-                                    o.optString("info"),
-                                    o.optString("imagePath")
-                            );
-                            ingrList.add(ie);
-                        }
-                    }
-                    if (p.length > 10 && !p[10].isEmpty()) {
-                        String instrJson = new String(Base64.getDecoder().decode(p[10]));
-                        JSONArray ia = new JSONArray(instrJson);
-                        for (int i = 0; i < ia.length(); i++) instrList.add(ia.getString(i));
-                    }
-                } catch (Exception ex) {
-
-                }
-
-                Recipe r = new Recipe(id, name, cos_sum, costCook, costPer, cart, nutrition, ingrList, instrList, desc, img);
-                list.add(r);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return list;
-    }
-
-    private void saveRecipesToFile() {
-        try {
-            File file = new File(CUSTOM_RECIPE_FILE);
-            if (!file.getParentFile().exists()) file.getParentFile().mkdirs();
-            try (FileWriter fw = new FileWriter(file)) {
-                fw.write("recipe_ID\trecipe_name\trecipe_cos_sum\tcost_cook\tcost_per_serving\tcart_cost\tnutrition_grade\tdescription\timagePath\tingredients_base64\tinstructions_base64\n");
-                for (Recipe r : recipes) {
-                    JSONArray ingrArr = new JSONArray();
-                    for (IngredientEntry ie : r.recipe_ingredients) {
-                        JSONObject o = new JSONObject();
-                        o.put("name", ie.name);
-                        o.put("quantity", ie.quantity);
-                        o.put("unit", ie.unit);
-                        o.put("info", ie.info != null ? ie.info : "");
-                        o.put("imagePath", ie.imagePath != null ? ie.imagePath : "");
-                        ingrArr.put(o);
-                    }
-                    String ingrBase64 = Base64.getEncoder().encodeToString(ingrArr.toString().getBytes());
-
-                    JSONArray instrArr = new JSONArray();
-                    for (String s : r.instructions) instrArr.put(s);
-                    String instrBase64 = Base64.getEncoder().encodeToString(instrArr.toString().getBytes());
-
-                    fw.write(String.format("%d\t%s\t%.2f\t%.2f\t%.2f\t%.2f\t%s\t%s\t%s\t%s\t%s\n",
-                            r.recipe_ID,
-                            r.recipe_name,
-                            r.recipe_cos_sum,
-                            r.cost_cook,
-                            r.cost_per_serving,
-                            r.cart_cost,
-                            r.nutrition_grade != null ? r.nutrition_grade : "",
-                            r.description != null ? r.description.replace("\n"," ") : "",
-                            r.imagePath != null ? r.imagePath : "",
-                            ingrBase64,
-                            instrBase64
-                    ));
-                }
-            }
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Failed to save recipes: " + e.getMessage());
-        }
+    private double safeParseDouble(String s) {
+        try { return Double.parseDouble(s.trim()); } catch (Exception e) { return 0.0; }
     }
 
     //==============================================================================================================
     // Helpers
     //==============================================================================================================
     private boolean matchesSearch(String name) {
-        String term = searchField.getText().trim().toLowerCase();
-        return term.isEmpty() || name.toLowerCase().contains(term);
-    }
-
-    private void refreshGrid() {
-        remove(scrollPane);
-        List<Recipe> toShow = showingFavorites
-                ? recipes.stream().filter(r -> favoriteRecipeIds.contains(r.recipe_ID)).toList()
-                : recipes;
-        gridPanel = buildGridPanel(toShow);
-        scrollPane = new JScrollPane(gridPanel);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        add(scrollPane, BorderLayout.CENTER);
-        revalidate();
-        repaint();
+        String search = searchField.getText().trim().toLowerCase();
+        return search.isEmpty() || (name != null && name.toLowerCase().contains(search));
     }
 
     private void showAll() {
@@ -635,22 +522,110 @@ public class Page4 extends JPanel {
         refreshGrid();
     }
 
-    private int safeParseInt(String s) {
-        try { return Integer.parseInt(s.trim()); } catch (Exception e) { return 0; }
+    private void refreshGrid() {
+        List<Recipe> toShow;
+        if (showingFavorites) {
+            toShow = new ArrayList<>();
+            for (Recipe r : recipes) {
+                if (favoriteRecipeIds.contains(r.recipe_ID)) toShow.add(r);
+            }
+        } else {
+            toShow = new ArrayList<>(recipes);
+        }
+
+        gridPanel = buildGridPanel(toShow);
+        scrollPane.setViewportView(gridPanel);
+        revalidate();
+        repaint();
     }
 
-    private double safeParseDouble(String s) {
-        try { return Double.parseDouble(s.trim()); } catch (Exception e) { return 0.0; }
+    private void saveRecipesToFile() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(CUSTOM_RECIPE_FILE))) {
+            for (Recipe r : recipes) {
+                JSONObject obj = new JSONObject();
+                obj.put("recipe_ID", r.recipe_ID);
+                obj.put("recipe_name", r.recipe_name);
+                obj.put("description", r.description != null ? r.description : "");
+                obj.put("cost_cook", r.cost_cook);
+                obj.put("cost_per_serving", r.cost_per_serving);
+                obj.put("cart_cost", r.cart_cost);
+                obj.put("nutrition_grade", r.nutrition_grade);
+                obj.put("imagePath", r.imagePath != null ? r.imagePath : "");
+
+                JSONArray ingredientsArr = new JSONArray();
+                for (IngredientEntry ie : r.recipe_ingredients) {
+                    JSONObject ing = new JSONObject();
+                    ing.put("name", ie.name);
+                    ing.put("quantity", ie.quantity);
+                    ing.put("unit", ie.unit);
+                    ing.put("info", ie.info != null ? ie.info : "");
+                    ing.put("imagePath", ie.imagePath != null ? ie.imagePath : "");
+                    ingredientsArr.put(ing);
+                }
+                obj.put("recipe_ingredients", ingredientsArr);
+
+                JSONArray instrArr = new JSONArray();
+                for (String s : r.instructions) instrArr.put(s);
+                obj.put("instructions", instrArr);
+
+                writer.write(obj.toString());
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private List<Recipe> loadRecipes(String path) {
+        List<Recipe> list = new ArrayList<>();
+        File f = new File(path);
+        if (!f.exists()) return list;
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(f))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                JSONObject obj = new JSONObject(line);
+                int id = obj.getInt("recipe_ID");
+                String name = obj.getString("recipe_name");
+                double costCook = obj.optDouble("cost_cook", 0.0);
+                double costPer = obj.optDouble("cost_per_serving", 0.0);
+                double cartCost = obj.optDouble("cart_cost", 0.0);
+                String nutrition = obj.optString("nutrition_grade", "");
+                String desc = obj.optString("description", "");
+                String imagePath = obj.optString("imagePath", "");
+
+                JSONArray ingrArr = obj.optJSONArray("recipe_ingredients");
+                List<IngredientEntry> ingrList = new ArrayList<>();
+                if (ingrArr != null) {
+                    for (int i = 0; i < ingrArr.length(); i++) {
+                        JSONObject ingObj = ingrArr.getJSONObject(i);
+                        ingrList.add(new IngredientEntry(
+                                ingObj.optString("name"),
+                                ingObj.optDouble("quantity", 0.0),
+                                ingObj.optString("unit", "unit"),
+                                ingObj.optString("info", ""),
+                                ingObj.optString("imagePath", "")
+                        ));
+                    }
+                }
+
+                JSONArray instrArr = obj.optJSONArray("instructions");
+                List<String> instrList = new ArrayList<>();
+                if (instrArr != null) for (int i = 0; i < instrArr.length(); i++) instrList.add(instrArr.getString(i));
+
+                list.add(new Recipe(id, name, 0.0, costCook, costPer, cartCost, nutrition, ingrList, instrList, desc, imagePath));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 
     private ImageIcon loadImageIcon(String path, int width, int height) {
         if (path == null || path.isEmpty()) return null;
-        File f = new File(path);
-        if (!f.exists()) return null;
-        ImageIcon icon = new ImageIcon(f.getAbsolutePath());
+        ImageIcon icon = new ImageIcon(path);
         Image img = icon.getImage();
         Image scaled = img.getScaledInstance(width, height, Image.SCALE_SMOOTH);
         return new ImageIcon(scaled);
     }
-
 }

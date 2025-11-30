@@ -7,250 +7,253 @@ import java.util.*;
 import java.util.List;
 import javax.swing.*;
 
+//=====================================================================
+// SuggestionsPage
+//=====================================================================
 public class SuggestionsPage extends JPanel {
 
-    private final Color LIGHT_GRAY = new Color(240, 240, 240);
-    private final Color DARK_GRAY = new Color(45, 45, 45);
+    private final Connection dbConnection;
+    private final IKrogerWrapper krogerWrapper;
 
+    private List<Recipe> recipes = new ArrayList<>();
     private JPanel gridPanel;
     private JScrollPane scrollPane;
-    private IKrogerWrapper krogerWrapper; // Optional: fetch product prices
-    private Connection dbConnection; // MySQL connection
 
-    private JComboBox<String> priceFilterDropdown;
-    private JComboBox<String> nutriScoreFilter;
+    private JComboBox<String> gradeFilter;
+    private JTextField minPriceField;
+    private JTextField maxPriceField;
+    private JButton filterButton;
 
-    private List<Recipe> allRecipes;
+    // NutriScore ordering
+    private static final String GRADES = "ABCDE";
 
-    public SuggestionsPage(Connection dbConnection, IKrogerWrapper krogerWrapper) {
-        this.dbConnection = dbConnection;
-        this.krogerWrapper = krogerWrapper;
+    //==============================
+    // Recipe class
+    //==============================
+    public static class Recipe {
+        public int id;
+        public String name;
+        public double ingredientCostSum;
+        public double costCook;
+        public double costPerServing;
+        public double cartCost;
+        public String nutritionGrade;
+        public List<Ingredient> ingredients;
 
-        setLayout(new BorderLayout());
-        setBackground(LIGHT_GRAY);
-        setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-
-        JLabel title = new JLabel("Recipe Suggestions", SwingConstants.CENTER);
-        title.setFont(new Font("Segoe UI", Font.BOLD, 32));
-        title.setForeground(DARK_GRAY);
-
-        JPanel titlePanel = new JPanel(new BorderLayout());
-        titlePanel.setBackground(LIGHT_GRAY);
-        titlePanel.add(title, BorderLayout.CENTER);
-        titlePanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
-        add(titlePanel, BorderLayout.NORTH);
-
-        // Filter panel
-        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 10));
-        filterPanel.setBackground(LIGHT_GRAY);
-
-        // Max Price dropdown
-        filterPanel.add(new JLabel("Max Price ($):"));
-        String[] priceOptions = {"No Limit", "5", "10", "15", "20", "25", "30"};
-        priceFilterDropdown = new JComboBox<>(priceOptions);
-        priceFilterDropdown.setSelectedIndex(0);
-        filterPanel.add(priceFilterDropdown);
-
-        // NutriScore filter
-        filterPanel.add(new JLabel("NutriScore:"));
-        nutriScoreFilter = new JComboBox<>(new String[]{"A", "B", "C", "D", "E"});
-        nutriScoreFilter.setSelectedIndex(0);
-        filterPanel.add(nutriScoreFilter);
-
-        JButton applyFilterButton = new JButton("Apply Filters");
-        filterPanel.add(applyFilterButton);
-
-        add(filterPanel, BorderLayout.NORTH);
-
-        // Grid panel
-        gridPanel = new JPanel(new WrapLayout(FlowLayout.LEFT, 15, 15));
-        scrollPane = new JScrollPane(gridPanel);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        add(scrollPane, BorderLayout.CENTER);
-
-        // Load recipes
-        SwingUtilities.invokeLater(() -> {
-            allRecipes = fetchRecipesFromDB();
-            updateGrid();
-        });
-
-        // Filter action
-        applyFilterButton.addActionListener(e -> updateGrid());
-    }
-
-    // Apply filters and refresh grid
-    private void updateGrid() {
-        gridPanel.removeAll();
-
-        double maxPrice = Double.MAX_VALUE;
-        String minNutriScore = (String) nutriScoreFilter.getSelectedItem();
-
-        // Get selected max price from dropdown
-        String selectedPrice = (String) priceFilterDropdown.getSelectedItem();
-        if (selectedPrice != null && !selectedPrice.equals("No Limit")) {
-            try {
-                maxPrice = Double.parseDouble(selectedPrice);
-            } catch (NumberFormatException ignored) {}
-        }
-
-        for (Recipe r : allRecipes) {
-            double totalPrice = r.totalPrice();
-            String recipeNutriScore = r.worstNutriScore();
-            if (totalPrice <= maxPrice && compareNutriScores(recipeNutriScore, minNutriScore) <= 0) {
-                gridPanel.add(createRecipeCard(r));
-            }
-        }
-
-        gridPanel.revalidate();
-        gridPanel.repaint();
-    }
-
-    // Returns -1 if score1 < score2, 0 if equal, 1 if score1 > score2 (A < B < C < D < E)
-    private int compareNutriScores(String score1, String score2) {
-        String order = "ABCDE";
-        return Integer.compare(order.indexOf(score1), order.indexOf(score2));
-    }
-
-    private List<Recipe> fetchRecipesFromDB() {
-        List<Recipe> recipes = new ArrayList<>();
-        String query = "SELECT recipe_ID, recipe_name, instructions FROM Recipes";
-
-        try (Statement stmt = dbConnection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
-
-            while (rs.next()) {
-                int id = rs.getInt("recipe_ID");
-                String name = rs.getString("recipe_name");
-                String instructions = rs.getString("instructions");
-
-                List<Ingredient> ingredients = fetchIngredientsForRecipe(id);
-                recipes.add(new Recipe(id, name, instructions, ingredients));
-            }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return recipes;
-    }
-
-    private List<Ingredient> fetchIngredientsForRecipe(int recipeId) {
-        List<Ingredient> ingredients = new ArrayList<>();
-        String query = "SELECT I.ingredient_ID, I.ingredient_name, I.calories, I.protein, I.carbs, I.fats, I.nutriscore, I.price " +
-                       "FROM RecipeIngredients RI " +
-                       "JOIN Ingredients I ON RI.ingredient_ID = I.ingredient_ID " +
-                       "WHERE RI.recipe_ID = ?";
-
-        try (PreparedStatement ps = dbConnection.prepareStatement(query)) {
-            ps.setInt(1, recipeId);
-            ResultSet rs = ps.executeQuery();
-
-            while (rs.next()) {
-                ingredients.add(new Ingredient(
-                        rs.getInt("ingredient_ID"),
-                        rs.getString("ingredient_name"),
-                        rs.getDouble("calories"),
-                        rs.getDouble("protein"),
-                        rs.getDouble("carbs"),
-                        rs.getDouble("fats"),
-                        rs.getString("nutriscore"),
-                        rs.getDouble("price")
-                ));
-            }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return ingredients;
-    }
-
-    private JPanel createRecipeCard(Recipe r) {
-        JPanel card = new JPanel();
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setPreferredSize(new Dimension(220, 200));
-        card.setBackground(Color.WHITE);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Color.LIGHT_GRAY),
-                BorderFactory.createEmptyBorder(10, 10, 10, 10)
-        ));
-
-        JLabel name = new JLabel("<html><center>" + r.name + "</center></html>");
-        name.setFont(new Font("SansSerif", Font.BOLD, 16));
-        name.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JTextArea ingredientsArea = new JTextArea();
-        ingredientsArea.setText(r.ingredientsString() + "\nPrice: $" + String.format("%.2f", r.totalPrice()) +
-                "\nNutriScore: " + r.worstNutriScore());
-        ingredientsArea.setWrapStyleWord(true);
-        ingredientsArea.setLineWrap(true);
-        ingredientsArea.setEditable(false);
-        ingredientsArea.setBackground(Color.WHITE);
-
-        card.add(name);
-        card.add(Box.createRigidArea(new Dimension(0, 5)));
-        card.add(ingredientsArea);
-
-        return card;
-    }
-
-    // Inner classes
-    private static class Recipe {
-        int id;
-        String name;
-        String instructions;
-        List<Ingredient> ingredients;
-
-        public Recipe(int id, String name, String instructions, List<Ingredient> ingredients) {
+        public Recipe(int id, String name, double ingredientCostSum, double costCook, double costPerServing,
+                      double cartCost, String nutritionGrade, List<Ingredient> ingredients) {
             this.id = id;
             this.name = name;
-            this.instructions = instructions;
-            this.ingredients = ingredients;
+            this.ingredientCostSum = ingredientCostSum;
+            this.costCook = costCook;
+            this.costPerServing = costPerServing;
+            this.cartCost = cartCost;
+            this.nutritionGrade = nutritionGrade != null ? nutritionGrade : "Unknown";
+            this.ingredients = ingredients != null ? ingredients : new ArrayList<>();
         }
 
-        public String ingredientsString() {
-            StringBuilder sb = new StringBuilder();
-            for (Ingredient i : ingredients) {
-                sb.append(i.name).append(", ");
-            }
-            return sb.length() > 2 ? sb.substring(0, sb.length() - 2) : "";
+        // Compute total ingredient cost dynamically
+        public double totalIngredientCost() {
+            return ingredientCostSum;
         }
 
-        public double totalPrice() {
-            double sum = 0;
-            for (Ingredient i : ingredients) sum += i.price;
-            return sum;
-        }
-
+        // Worst NutriScore among ingredients
         public String worstNutriScore() {
             String worst = "A";
-            String order = "ABCDE";
-            for (Ingredient i : ingredients) {
-                if (order.indexOf(i.nutriscore) > order.indexOf(worst)) worst = i.nutriscore;
+            for (Ingredient ing : ingredients) {
+                if (GRADES.indexOf(ing.nutriScore) > GRADES.indexOf(worst)) worst = ing.nutriScore;
             }
             return worst;
         }
     }
 
-    private static class Ingredient {
-        int id;
-        String name;
-        double calories;
-        double protein;
-        double carbs;
-        double fats;
-        String nutriscore;
-        double price;
+    //==============================
+    // Ingredient class
+    //==============================
+    public static class Ingredient {
+        public String name;
+        public double price;
+        public String nutriScore;
 
-        public Ingredient(int id, String name, double calories, double protein, double carbs, double fats, String nutriscore, double price) {
-            this.id = id;
+        public Ingredient(String name, double price, String nutriScore) {
             this.name = name;
-            this.calories = calories;
-            this.protein = protein;
-            this.carbs = carbs;
-            this.fats = fats;
-            this.nutriscore = nutriscore;
             this.price = price;
+            this.nutriScore = nutriScore != null ? nutriScore : "A";
         }
+    }
+
+    //==============================
+    // Constructor
+    //==============================
+    public SuggestionsPage(Connection dbConnection, IKrogerWrapper krogerWrapper) {
+        this.dbConnection = dbConnection;
+        this.krogerWrapper = krogerWrapper;
+
+        setLayout(new BorderLayout());
+
+        buildUI();
+        loadRecipesFromDB();
+        refreshGrid();
+    }
+
+    //==============================
+    // Build UI
+    //==============================
+    private void buildUI() {
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
+
+        gradeFilter = new JComboBox<>(new String[]{"All", "A", "B", "C", "D", "E"});
+        minPriceField = new JTextField(5);
+        maxPriceField = new JTextField(5);
+        filterButton = new JButton("Filter");
+        filterButton.addActionListener(e -> refreshGrid());
+
+        topPanel.add(new JLabel("Grade:"));
+        topPanel.add(gradeFilter);
+        topPanel.add(new JLabel("Min $:"));
+        topPanel.add(minPriceField);
+        topPanel.add(new JLabel("Max $:"));
+        topPanel.add(maxPriceField);
+        topPanel.add(filterButton);
+
+        add(topPanel, BorderLayout.NORTH);
+
+        gridPanel = new JPanel();
+        gridPanel.setBackground(Color.WHITE);
+
+        scrollPane = new JScrollPane(gridPanel);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        add(scrollPane, BorderLayout.CENTER);
+    }
+
+    //==============================
+    // Load recipes from DB
+    //==============================
+    private void loadRecipesFromDB() {
+        recipes.clear();
+
+        if (dbConnection == null) {
+            System.out.println("⚠ DB connection is null, cannot load recipes.");
+            return;
+        }
+
+        try (Statement stmt = dbConnection.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                     "SELECT recipe_ID, recipe_name, ingredient_cost_sum, cost_cook, cost_per_serving, cart_cost, nutrition_grade " +
+                             "FROM Recipes"
+             )) {
+
+            while (rs.next()) {
+                int id = rs.getInt("recipe_ID");
+                String name = rs.getString("recipe_name");
+                double ingCost = rs.getDouble("ingredient_cost_sum");
+                double costCook = rs.getDouble("cost_cook");
+                double costPerServ = rs.getDouble("cost_per_serving");
+                double cartCost = rs.getDouble("cart_cost");
+                String grade = rs.getString("nutrition_grade");
+
+                // For worstNutriScore, use dummy ingredient list (replace with real ingredients if available)
+                List<Ingredient> ingredients = new ArrayList<>();
+                ingredients.add(new Ingredient("Dummy", ingCost, grade != null ? grade : "A"));
+
+                recipes.add(new Recipe(id, name, ingCost, costCook, costPerServ, cartCost, grade, ingredients));
+            }
+
+            System.out.println("Loaded recipes: " + recipes.size());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    //==============================
+    // Refresh grid (filter by grade and price)
+    //==============================
+    private void refreshGrid() {
+        String selectedGrade = gradeFilter.getSelectedItem().toString();
+        double minPrice = 0;
+        double maxPrice = Double.MAX_VALUE;
+
+        try {
+            if (!minPriceField.getText().trim().isEmpty())
+                minPrice = Double.parseDouble(minPriceField.getText().trim());
+        } catch (NumberFormatException ignored) {}
+
+        try {
+            if (!maxPriceField.getText().trim().isEmpty())
+                maxPrice = Double.parseDouble(maxPriceField.getText().trim());
+        } catch (NumberFormatException ignored) {}
+
+        List<Recipe> filtered = new ArrayList<>();
+        for (Recipe r : recipes) {
+            boolean matchesGrade = selectedGrade.equals("All") || r.worstNutriScore().equalsIgnoreCase(selectedGrade);
+            boolean matchesPrice = r.totalIngredientCost() >= minPrice && r.totalIngredientCost() <= maxPrice;
+
+            if (matchesGrade && matchesPrice) filtered.add(r);
+        }
+
+        gridPanel = buildGridPanelForRecipes(filtered);
+        scrollPane.setViewportView(gridPanel);
+        revalidate();
+        repaint();
+    }
+
+    //==============================
+    // Build grid panel
+    //==============================
+    private JPanel buildGridPanelForRecipes(List<Recipe> items) {
+        JPanel grid = new JPanel(new WrapLayout(FlowLayout.LEFT, 15, 15));
+        grid.setBackground(Color.WHITE);
+
+        for (Recipe r : items) {
+            grid.add(createRecipeCard(r));
+        }
+
+        return grid;
+    }
+
+    //==============================
+    // Create recipe card
+    //==============================
+    private JPanel createRecipeCard(Recipe r) {
+        JPanel card = new JPanel();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+        card.setBackground(new Color(250, 250, 250));
+        card.setPreferredSize(new Dimension(180, 180));
+
+        JLabel name = new JLabel(r.name, SwingConstants.CENTER);
+        name.setFont(new Font("SansSerif", Font.BOLD, 14));
+        name.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel grade = new JLabel(r.worstNutriScore(), SwingConstants.CENTER);
+        grade.setAlignmentX(Component.CENTER_ALIGNMENT);
+        grade.setOpaque(true);
+        grade.setForeground(Color.WHITE);
+        grade.setFont(new Font("SansSerif", Font.BOLD, 16));
+        grade.setPreferredSize(new Dimension(50, 25));
+        grade.setHorizontalAlignment(SwingConstants.CENTER);
+
+        switch (r.worstNutriScore().toUpperCase()) {
+            case "A": grade.setBackground(new Color(0, 153, 0)); break;
+            case "B": grade.setBackground(new Color(153, 204, 0)); break;
+            case "C": grade.setBackground(new Color(255, 204, 0)); break;
+            case "D": grade.setBackground(new Color(255, 153, 51)); break;
+            case "E": grade.setBackground(new Color(204, 0, 0)); break;
+            default: grade.setBackground(Color.GRAY);
+        }
+
+        JLabel price = new JLabel(String.format("$%.2f", r.totalIngredientCost()), SwingConstants.CENTER);
+        price.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        card.add(Box.createVerticalStrut(8));
+        card.add(name);
+        card.add(Box.createVerticalStrut(8));
+        card.add(grade);
+        card.add(Box.createVerticalStrut(8));
+        card.add(price);
+
+        return card;
     }
 }
