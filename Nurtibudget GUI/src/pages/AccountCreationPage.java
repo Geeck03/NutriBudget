@@ -2,6 +2,9 @@ package pages;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.*;
+import javax.swing.SwingUtilities;
+import utils.PythonBridge;
 
 //==============================================================================================================
 // AccountCreationPage Class
@@ -60,8 +63,32 @@ public class AccountCreationPage extends JPanel {
         //==========================================================================================================
         JButton createAccountButton = styledButton("Create Account", OKSTATE_ORANGE, WHITE);
         createAccountButton.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Account created!");
-            onAccountCreated.run();
+            String username = newUsernameField.getText();
+            String password = new String(newPasswordField.getPassword());
+
+            new Thread(() -> {
+                String script = System.getProperty("user.dir") + File.separator + "Nurtibudget GUI" + File.separator + "SQLHandler" + File.separator + "UserRegistration.py";
+                String result = PythonBridge.runWithStdin(script, "register", username, password);
+
+                SwingUtilities.invokeLater(() -> {
+                    if (result == null) {
+                        JOptionPane.showMessageDialog(this, "Registration error (couldn't run registrar)", "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    String out = result.trim();
+                    switch (out) {
+                        case "CREATED":
+                            JOptionPane.showMessageDialog(this, "Account created!");
+                            onAccountCreated.run();
+                            break;
+                        case "EXISTS":
+                            JOptionPane.showMessageDialog(this, "User already exists.", "Registration Failed", JOptionPane.ERROR_MESSAGE);
+                            break;
+                        default:
+                            JOptionPane.showMessageDialog(this, "Registration error: " + out, "Registration Failed", JOptionPane.ERROR_MESSAGE);
+                    }
+                });
+            }).start();
         });
 
         JButton backButton = styledButton("Back to Login", DARK_GRAY, WHITE);
@@ -135,5 +162,7 @@ public class AccountCreationPage extends JPanel {
 
         return button;
     }
+
+    
 
 }

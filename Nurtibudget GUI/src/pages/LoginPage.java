@@ -2,6 +2,9 @@ package pages;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.*;
+import javax.swing.SwingUtilities;
+import utils.PythonBridge;
 
 //==============================================================================================================
 // LoginPage Class
@@ -59,7 +62,36 @@ public class LoginPage extends JPanel {
         // Buttons
         //==========================================================================================================
         JButton loginButton = styledButton("Login", OKSTATE_ORANGE, WHITE);
-        loginButton.addActionListener(e -> onLoginSuccess.run());
+        loginButton.addActionListener(e -> {
+            String username = usernameField.getText();
+            String password = new String(passwordField.getPassword());
+
+            // call python script in background thread and send credentials over stdin
+            new Thread(() -> {
+                String script = System.getProperty("user.dir") + File.separator + "Nurtibudget GUI" + File.separator + "SQLHandler" + File.separator + "LoginValidator.py";
+                String result = PythonBridge.runWithStdin(script, "login", username, password);
+
+                SwingUtilities.invokeLater(() -> {
+                    if (result == null) {
+                        JOptionPane.showMessageDialog(this, "Login error (couldn't run validator)", "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    String out = result.trim();
+                    // Handle responses that may include prefixes (e.g. "Error: INVALID_CREDENTIALS")
+                    if ("OK".equals(out)) {
+                        onLoginSuccess.run();
+                    } 
+                    
+                    else if (out.contains("Invalid username or password.")) {
+                        JOptionPane.showMessageDialog(this, "Invalid username or password.", "Login Failed", JOptionPane.ERROR_MESSAGE);
+                    }
+                    
+                    else {
+                        JOptionPane.showMessageDialog(this, "Login error: " + out, "Login Failed", JOptionPane.ERROR_MESSAGE);
+                    }
+                });
+            }).start();
+        });
 
         JButton createAccountButton = styledButton("Create Account", DARK_GRAY, WHITE);
         createAccountButton.addActionListener(e -> onCreateAccount.run());
@@ -134,3 +166,5 @@ public class LoginPage extends JPanel {
     }
 
 }
+
+    

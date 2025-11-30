@@ -492,9 +492,34 @@ public class Page2 extends JPanel {
 
     private List<Recipe> loadRecipes(String path) {
         List<Recipe> list = new ArrayList<>();
-        try (InputStream in = getClass().getResourceAsStream(path);
-             BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
-            String line; br.readLine();
+        InputStream in = null;
+        BufferedReader br = null;
+        try {
+            // Try a few resource lookup strategies (classpath relative, absolute, package-relative)
+            in = getClass().getResourceAsStream(path); // relative to package 'pages'
+            if (in == null) in = getClass().getResourceAsStream('/' + path); // absolute
+            if (in == null) in = getClass().getResourceAsStream('/' + getClass().getPackageName().replace('.', '/') + '/' + path);
+
+            // Filesystem fallback (useful when running from IDE where resources are not on classpath)
+            if (in == null) {
+                Path fsPath = Paths.get("Nurtibudget GUI", "src", "pages", path.replace('/', File.separatorChar));
+                if (Files.exists(fsPath)) {
+                    in = Files.newInputStream(fsPath);
+                } else {
+                    // try src/pages/<path>
+                    fsPath = Paths.get("src", "pages", path.replace('/', File.separatorChar));
+                    if (Files.exists(fsPath)) in = Files.newInputStream(fsPath);
+                }
+            }
+
+            if (in == null) {
+                System.err.println("Could not find recipes resource: " + path);
+                return list;
+            }
+
+            br = new BufferedReader(new InputStreamReader(in));
+            // skip header if present
+            String line = br.readLine();
             while ((line = br.readLine()) != null) {
                 if (line.trim().isEmpty()) continue;
                 String[] p = line.split("\t");
@@ -506,7 +531,11 @@ public class Page2 extends JPanel {
                             p.length > 7 ? p[7] : "", p.length > 8 ? p[8] : ""));
                 }
             }
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try { if (br != null) br.close(); else if (in != null) in.close(); } catch (IOException ignored) {}
+        }
         return list;
     }
 
