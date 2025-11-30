@@ -6,6 +6,9 @@ package pages;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+
+import static java.awt.Component.LOCK;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
@@ -20,9 +23,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 import bridge.Py4JHelper;
 import pages.CustomIngredientDialog;
-
-
-
+import py4j.ClientServer;
+import py4j.Py4JNetworkException;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -669,7 +671,29 @@ private void loadRecipesFromFile() {
   //==============================================================================================================
   // Kroger API Search
   //==============================================================================================================
+public static void connectToExistingBridge(String host, int port) {
+    synchronized (LOCK) {
+        if (client != null) return; // already connected
+        try {
+            client = new ClientServer.ClientServerBuilder()
+                    .javaPort(0)        // any available local port
+                    .pythonPort(port)   // your Python bridge port
+                    .build();
+            System.out.println("✅ Connected to existing Python bridge at " + host + ":" + port);
+        } catch (Py4JNetworkException ex) {
+            System.err.println("Failed to connect to Python bridge: " + ex.getMessage());
+            client = null;
+        } catch (Throwable t) {
+            t.printStackTrace();
+            client = null;
+        }
+    }
+}
+
+
   private void doSearch() {
+
+
    // In constructor after Py4JHelper is initialized
 
 
@@ -688,22 +712,11 @@ private void loadRecipesFromFile() {
 
 
       SwingWorker<JSONArray, Void> worker = new SwingWorker<>() {
-          @Override
-          protected JSONArray doInBackground() {
-              try {
-                  IKrogerWrapper wrapper = Py4JHelper.getWrapper();
-                  if (wrapper == null) throw new IllegalStateException("Kroger bridge unavailable");
-                  String raw = wrapper.search(q, 10);
-                  if (raw == null || raw.trim().isEmpty()) return new JSONArray();
-                  return new JSONArray(raw);
-              } catch (Exception e) {
-                  e.printStackTrace();
-                  return new JSONArray(); // Return empty array on error
-              }
-          }
-
-
-
+        @Override
+        protected JSONArray doInBackground() {
+            List<JSONObject> list = loadIngredientsFromPython(q);
+            return new JSONArray(list);
+        }
 
           @Override
           protected void done() {
@@ -762,12 +775,14 @@ private void testKrogerSearch(String query) {
   //==============================================================================================================
   // Favorites
   //==============================================================================================================
-  private void addSelectedToFavorites() {
-      JSONObject sel = resultsList.getSelectedValue();
-      if (sel == null) { JOptionPane.showMessageDialog(this, "Select item to favorite."); return; }
-      addFavorite(sel);
-  }
-
+private void addSelectedToFavorites() {
+    JSONObject sel = resultsList.getSelectedValue();
+    if (sel == null) { 
+        JOptionPane.showMessageDialog(this, "Select item to favorite."); 
+        return; 
+    }
+    addFavorite(sel);
+}
 
 
 
@@ -781,14 +796,25 @@ private void testKrogerSearch(String query) {
 
 
 
-  private void addFavorite(JSONObject product) {
-      String id = product.optString("productId", null);
-      if (id == null) return;
-      for (int i = 0; i < favoritesModel.size(); i++)
-          if (id.equals(favoritesModel.get(i).optString("productId"))) return;
-      favoritesModel.addElement(product);
-      saveFavorites();
-  }
+private void addFavorite(JSONObject product) {
+    String id = product.optString("id", null);
+    if (id == null) return;
+
+    JSONObject fav = new JSONObject();
+    fav.put("productId", id);
+    fav.put("name", product.optString("name", product.optString("description", "Unknown")));
+    fav.put("description", product.optString("description", ""));
+    fav.put("price", product.optDouble("price", 0.0));
+    fav.put("image_url", product.optString("image_url", ""));
+
+    // prevent duplicates
+    for (int i = 0; i < favoritesModel.size(); i++)
+        if (id.equals(favoritesModel.get(i).optString("productId"))) return;
+
+    favoritesModel.addElement(fav);
+    saveFavorites();
+}
+
 
 
 
@@ -877,51 +903,105 @@ private void testKrogerSearch(String query) {
   //==============================================================================================================
   // Cell renderer
   //==============================================================================================================
-  private static class ResultCellRenderer extends JPanel implements ListCellRenderer<JSONObject> {
-      private final JLabel lblImage = new JLabel();
-      private final JLabel lblText = new JLabel();
-      private final JLabel lblPrice = new JLabel();
-      public ResultCellRenderer() {
-          setLayout(new BorderLayout(8,0));
-          add(lblImage, BorderLayout.WEST);
-          JPanel mid = new JPanel(new BorderLayout());
-          mid.add(lblText, BorderLayout.CENTER);
-          mid.add(lblPrice, BorderLayout.SOUTH);
-          add(mid, BorderLayout.CENTER);
-      }
-      public Component getListCellRendererComponent(JList<? extends JSONObject> list, JSONObject value, int idx, boolean sel, boolean focus) {
-          if (value == null) return this;
-          lblText.setText(value.optString("description", "Unknown"));
-          lblPrice.setText(String.format("$%.2f", value.optDouble("price", 0.0)));
+private static class ResultCellRenderer extends JPanel implements ListCellRenderer<JSONObject> {
+    private final JLabel lblImage = new JLabel();
+    private final JLabel lblName = new JLabel();
+    private final JLabel lblPrice = new JLabel();
 
+    public ResultCellRenderer() {
+        setLayout(new BorderLayout(8, 0));
 
+        add(lblImage, BorderLayout.WEST);
 
+        JPanel mid = new JPanel(new BorderLayout());
+        mid.add(lblName, BorderLayout.CENTER);
+        mid.add(lblPrice, BorderLayout.SOUTH);
+        add(mid, BorderLayout.CENTER);
+    }
 
-          String imgUrl = value.optString("imageUrl", null);
-          if (imgUrl != null) {
-              ImageIcon icon = imageCache.get(imgUrl);
-              if (icon == null) {
-                  try { icon = new ImageIcon(new URL(imgUrl)); imageCache.put(imgUrl, icon); }
-                  catch (Exception e) { icon = PLACEHOLDER; }
-              }
-              Image img = icon.getImage().getScaledInstance(THUMB, THUMB, Image.SCALE_SMOOTH);
-              lblImage.setIcon(new ImageIcon(img));
-          } else lblImage.setIcon(PLACEHOLDER);
+    @Override
+    public Component getListCellRendererComponent(JList<? extends JSONObject> list, JSONObject value, int idx, boolean sel, boolean focus) {
+        if (value == null) return this;
 
+        // --- Display name ---
+        lblName.setText(value.optString("name", "Unknown"));
 
+        // --- Display price ---
+        double price = value.optDouble("price", 0.0);
+        lblPrice.setText(String.format("$%.2f", price));
 
+        // --- Handle image ---
+// Load image from URL
+String rawUrl = value.optString("image_url", "").trim();  // <- use image_url
+if (!rawUrl.isEmpty()) {
+    if (rawUrl.startsWith("//")) rawUrl = "https:" + rawUrl;
+    final String finalUrl = rawUrl;
 
-          setBackground(sel ? new Color(200, 220, 255) : Color.WHITE);
-          return this;
-      }
-  }
+    // Check cache
+    if (imageCache.containsKey(finalUrl)) {
+        lblImage.setIcon(scaleIcon(imageCache.get(finalUrl)));
+    } else {
+        new Thread(() -> {
+            try {
+                ImageIcon icon = new ImageIcon(new URL(finalUrl));
+                // Wait until image is fully loaded
+                Image img = icon.getImage();
+                MediaTracker tracker = new MediaTracker(new JLabel());
+                tracker.addImage(img, 0);
+                tracker.waitForAll();
+
+                if (!tracker.isErrorAny()) {
+                    ImageIcon scaledIcon = scaleIcon(icon);
+                    imageCache.put(finalUrl, scaledIcon);
+                    SwingUtilities.invokeLater(() -> lblImage.setIcon(scaledIcon));
+                }
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> lblImage.setIcon(PLACEHOLDER));
+            }
+        }).start();
+    }
+} else {
+    lblImage.setIcon(PLACEHOLDER);
 }
 
 
+        setBackground(sel ? new Color(200, 220, 255) : Color.WHITE);
+        return this;
+    }
 
+    private static ImageIcon scaleIcon(ImageIcon icon) {
+        Image img = icon.getImage().getScaledInstance(THUMB, THUMB, Image.SCALE_SMOOTH);
+        return new ImageIcon(img);
+    }
+}
 
+  private List<JSONObject> loadIngredientsFromPython(String query) {
+    List<JSONObject> list = new ArrayList<>();
 
+    // First, add existing favorites or static ingredients if needed
+    for (int i = 0; i < favoritesModel.size(); i++) {
+        JSONObject fav = favoritesModel.get(i);
+        if (fav.optString("description", "").toLowerCase().contains(query.toLowerCase())) {
+            list.add(fav);
+        }
+    }
 
+    // Then fetch from Kroger API via Py4J
+    try {
+        IKrogerWrapper wrapper = Py4JHelper.getWrapper();
+        if (wrapper != null) {
+            String raw = wrapper.search(query, 10);
+            if (raw != null && !raw.trim().isEmpty()) {
+                JSONArray arr = new JSONArray(raw);
+                for (int i = 0; i < arr.length(); i++) {
+                    list.add(arr.getJSONObject(i));
+                }
+            }
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
 
-
-
+    return list;
+}
+}

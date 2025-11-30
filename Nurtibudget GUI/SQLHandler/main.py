@@ -53,13 +53,13 @@ def start_py4j_server(ready_event):
         python_server_entry_point=wrapper
     )
     print("✅ Python Py4J server running on ports 25333/25334")
+    ready_event.set()  # <--- signal main thread
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         print("Py4J Server stopped.")
-
 
 # ===================== Database Test (Optional) =====================
 def test_database():

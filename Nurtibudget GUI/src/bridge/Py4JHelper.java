@@ -24,7 +24,11 @@ public class Py4JHelper {
             }
             attempted = true;
             try {
-                client = new ClientServer(null);
+                client = new ClientServer.ClientServerBuilder()
+                    .javaPort(0)        // any available local port
+                    .pythonPort(25334)  // must match Python server port
+                    .build();
+
                 System.out.println("✅ Py4J client connected/reused.");
                 return (IKrogerWrapper) client.getPythonServerEntryPoint(new Class[]{IKrogerWrapper.class});
             } catch (Py4JNetworkException ex) {
@@ -36,9 +40,11 @@ public class Py4JHelper {
                 client = null;
                 return null;
             }
+
         }
     }
 
+    
 
     public static void shutdown() {
         synchronized (LOCK) {
