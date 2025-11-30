@@ -629,8 +629,13 @@ private void refreshRecipesGrid() {
 
 
   private void showRecipeDialog(Recipe r) {
-      String info = String.format("Recipe: %s%nIngredients: %d%nCost/Serving: $%.2f%nNutrition Grade: %s%nInstructions: %s",
-              r.name, r.numIngredients, r.costPerServing, r.nutritionGrade, r.instructions);
+int numIngredients = r.ingredients != null ? r.ingredients.size() : 0;
+
+String info = String.format(
+    "Recipe: %s%nIngredients: %d%nCost/Serving: $%.2f%nNutrition Grade: %s%nInstructions: %s",
+    r.name, numIngredients, r.costPerServing, r.nutritionGrade, r.instructions
+);
+
       JOptionPane.showMessageDialog(this, info, "Recipe Info", JOptionPane.INFORMATION_MESSAGE);
   }
 

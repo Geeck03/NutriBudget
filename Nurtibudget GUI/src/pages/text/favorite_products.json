@@ -1,7 +1,23 @@
-[{
-  "productId": "0002840051648",
-  "price": 5.99,
-  "image_url": "https://www.kroger.com/product/images/xlarge/back/0002840051648",
-  "name": "Doritos® Tapatio® Flavored Tortilla Chips",
-  "description": "No description"
-}]
+[
+  {
+    "productId": "0002840051648",
+    "price": 5.99,
+    "image_url": "https://www.kroger.com/product/images/xlarge/back/0002840051648",
+    "name": "Doritos® Tapatio® Flavored Tortilla Chips",
+    "description": "No description"
+  },
+  {
+    "productId": "0002840051631",
+    "price": 5.99,
+    "image_url": "https://www.kroger.com/product/images/xlarge/left/0002840051631",
+    "name": "Doritos® Cool Ranch Flavored Tortilla Chips",
+    "description": "No description"
+  },
+  {
+    "productId": "0002840051646",
+    "price": 5.99,
+    "image_url": "https://www.kroger.com/product/images/xlarge/left/0002840051646",
+    "name": "Doritos® Nacho Cheese Flavored Tortilla Chips",
+    "description": "No description"
+  }
+]
