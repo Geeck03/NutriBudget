@@ -1,9 +1,13 @@
 from dataclasses import dataclass
 import sys
+import logging
 import mysql.connector
 from mysql.connector import Error
 
 from PasswordHash import hash_password
+
+# configure logging for server-side diagnostics (do not expose to clients)
+logging.basicConfig(level=logging.INFO)
 
 
 DB_USER = "442819"
@@ -44,27 +48,45 @@ def register_user(username: str, password: str) -> str:
 
     Returns: 'CREATED', 'EXISTS', or 'ERROR:...'
     """
+    # Basic input validation
+    if username is None:
+        return "INVALID_INPUT"
+    username = username.strip()
+    if username == "" or len(username) > 50:
+        return "INVALID_INPUT"
+
+    if password is None or password == "" or len(password) < 8:
+        return "INVALID_INPUT"
+
     try:
         conn = _connect()
         try:
             ensure_users_table(conn)
             cur = conn.cursor()
             # case-insensitive existence check
-            cur.execute("SELECT username FROM Users WHERE LOWER(username)=LOWER(%s)", (username.strip(),))
+            cur.execute("SELECT username FROM Users WHERE LOWER(username)=LOWER(%s)", (username,))
             row = cur.fetchone()
             if row is not None:
                 cur.close()
                 return "EXISTS"
 
-            pwd_hash = hash_password(password)
-            cur.execute("INSERT INTO Users (username, password_hash) VALUES (%s, %s)", (username.strip(), pwd_hash))
+            try:
+                pwd_hash = hash_password(password)
+            except ValueError:
+                return "INVALID_INPUT"
+
+            cur.execute("INSERT INTO Users (username, password_hash) VALUES (%s, %s)", (username, pwd_hash))
             conn.commit()
             cur.close()
             return "CREATED"
         finally:
             conn.close()
-    except Error as e:
-        return f"ERROR: {e}"
+    except Error:
+        logging.exception("Database error while registering user %s", username)
+        return "ERROR"
+    except Exception:
+        logging.exception("Unexpected error while registering user %s", username)
+        return "ERROR"
 
 
 if __name__ == '__main__':

@@ -52,22 +52,58 @@ public class AccountCreationPage extends JPanel {
         styleField(newUsernameField);
 
         //==========================================================================================================
-        // Password Field
+        // Password Fields
         //==========================================================================================================
         JLabel newPasswordLabel = new JLabel("New Password:");
         JPasswordField newPasswordField = new JPasswordField(15);
         styleField(newPasswordField);
+
+        // confirm password
+        JLabel confirmPasswordLabel = new JLabel("Confirm Password:");
+        JPasswordField confirmPasswordField = new JPasswordField(15);
+        styleField(confirmPasswordField);
 
         //==========================================================================================================
         // Buttons
         //==========================================================================================================
         JButton createAccountButton = styledButton("Create Account", OKSTATE_ORANGE, WHITE);
         createAccountButton.addActionListener(e -> {
-            String username = newUsernameField.getText();
+            String username = newUsernameField.getText() == null ? "" : newUsernameField.getText().trim();
             String password = new String(newPasswordField.getPassword());
+            String confirm = new String(confirmPasswordField.getPassword());
+
+            // Client-side validation
+            if (username.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please enter a username.", "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            if (username.length() > 50) {
+                JOptionPane.showMessageDialog(this, "Username must be 50 characters or fewer.", "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            if (password.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please enter a password.", "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            if (password.length() < 8) {
+                JOptionPane.showMessageDialog(this, "Password must be at least 8 characters.", "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            if (!password.equals(confirm)) {
+                JOptionPane.showMessageDialog(this, "Passwords do not match.", "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
 
             new Thread(() -> {
-                String script = System.getProperty("user.dir") + File.separator + "Nurtibudget GUI" + File.separator + "SQLHandler" + File.separator + "UserRegistration.py";
+                // Resolve script path robustly: if running from the `src` folder, use parent as project root
+                File cwd = new File(System.getProperty("user.dir"));
+                File projectRoot = cwd.getName().equals("src") && cwd.getParentFile() != null ? cwd.getParentFile() : cwd;
+                File scriptFile = new File(projectRoot, "SQLHandler" + File.separator + "UserRegistration.py");
+                String script = scriptFile.getAbsolutePath();
                 String result = PythonBridge.runWithStdin(script, "register", username, password);
 
                 SwingUtilities.invokeLater(() -> {
@@ -83,6 +119,9 @@ public class AccountCreationPage extends JPanel {
                             break;
                         case "EXISTS":
                             JOptionPane.showMessageDialog(this, "User already exists.", "Registration Failed", JOptionPane.ERROR_MESSAGE);
+                            break;
+                        case "INVALID_INPUT":
+                            JOptionPane.showMessageDialog(this, "Registration failed: invalid input.", "Registration Failed", JOptionPane.ERROR_MESSAGE);
                             break;
                         default:
                             JOptionPane.showMessageDialog(this, "Registration error: " + out, "Registration Failed", JOptionPane.ERROR_MESSAGE);
@@ -114,11 +153,18 @@ public class AccountCreationPage extends JPanel {
         gbc.gridx = 1;
         card.add(newPasswordField, gbc);
 
-        gbc.gridy = 3; gbc.gridx = 0; gbc.gridwidth = 2;
+        // confirm password row
+        gbc.gridy = 3; gbc.gridx = 0; gbc.gridwidth = 1;
+        card.add(confirmPasswordLabel, gbc);
+
+        gbc.gridx = 1;
+        card.add(confirmPasswordField, gbc);
+
+        gbc.gridy = 4; gbc.gridx = 0; gbc.gridwidth = 2;
         gbc.anchor = GridBagConstraints.CENTER;
         card.add(createAccountButton, gbc);
 
-        gbc.gridy = 4;
+        gbc.gridy = 5;
         card.add(backButton, gbc);
 
         add(card);

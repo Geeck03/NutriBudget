@@ -2,10 +2,13 @@
 
 from dataclasses import dataclass
 import sys
+import logging
 import mysql.connector
 from mysql.connector import Error
 
 from PasswordHash import hash_password
+
+logging.basicConfig(level=logging.INFO)
 
 
 DB_USER = "442819"
@@ -32,6 +35,9 @@ def verify_login(username: str, password: str) -> str:
     Returns one of: 'OK', 'NO_USER', 'INVALID_PASSWORD', 'ERROR:...'
     """
     try:
+        if username is None or password is None:
+            return "Invalid username or password."
+
         conn = _connect()
         try:
             cur = conn.cursor()
@@ -40,7 +46,6 @@ def verify_login(username: str, password: str) -> str:
             row = cur.fetchone()
             cur.close()
 
-            #FIXME: Does not display "Invalid username or password"
             if row is None:
                 return "Invalid username or password."
 
@@ -51,11 +56,14 @@ def verify_login(username: str, password: str) -> str:
                 return "OK"
             else:
                 return "Invalid username or password."
-            
         finally:
             conn.close()
-    except Error as e:
-        return f"ERROR: {e}"
+    except Error:
+        logging.exception("Database error during login for user %s", username)
+        return "ERROR"
+    except Exception:
+        logging.exception("Unexpected error during login for user %s", username)
+        return "ERROR"
 
 
 if __name__ == '__main__':

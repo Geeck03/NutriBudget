@@ -68,8 +68,12 @@ public class LoginPage extends JPanel {
 
             // call python script in background thread and send credentials over stdin
             new Thread(() -> {
-                String script = System.getProperty("user.dir") + File.separator + "Nurtibudget GUI" + File.separator + "SQLHandler" + File.separator + "LoginValidator.py";
-                String result = PythonBridge.runWithStdin(script, "login", username, password);
+                // Resolve script path robustly: if running from the `src` folder, use parent as project root
+                File cwd = new File(System.getProperty("user.dir"));
+                File projectRoot = cwd.getName().equals("src") && cwd.getParentFile() != null ? cwd.getParentFile() : cwd;
+                File scriptFile = new File(projectRoot, "SQLHandler" + File.separator + "LoginValidator.py");
+                String script = scriptFile.getAbsolutePath();
+                    String result = PythonBridge.runWithStdin(script, "login", username, password);
 
                 SwingUtilities.invokeLater(() -> {
                     if (result == null) {
