@@ -645,29 +645,6 @@ class MySQLHandler:
             if cursor:
                 cursor.close()
     
-    # Helper: Safely convert to float
-    def _safe_float(self, value):
-        if value in (None, "", [], {}):
-            return 0.0
-        if isinstance(value, int):
-            value = value 
-            return value
-        if isinstance(value, str) and value.startswith("$"):
-            value = value.replace("$", "")
-            return float(value)
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            print(f"[ERROR] Failed to safely convert value to float.")
-            return 0.0
-        
-    # Helper: Extract a nutrient value by displayName
-    def _get_nutrient(self, ingredient_data, nutrient_name):
-        for n in ingredient_data or []:
-            if n.get("displayName", "").lower() == nutrient_name.lower():
-                return n.get("quantity", 0.0)
-        return 0.0
-    
     # Helper: Call fetch_one() with other paramters
     def get_recipe_helper(self, recipe_id: int, column: str) -> Optional[Any]:
         """
@@ -678,3 +655,234 @@ class MySQLHandler:
             (recipe_id,)
         )
         return row[column] if row is not None else None
+    
+    
+    def update_increment(self, table, key_col, key_val, increments: dict): 
+        '''
+        This function increments values in a database row if the the given 
+        row is numeric 
+    
+        Ex. Increments = {"calories": 20, "carbs": 2} 
+        This will become 
+            calories = calories + 20 # Update the calories row add 20 
+            carbs = carbs + 2 # Update the carbs row add 2 
+    
+        '''
+        # Check if there is connection if not reconnect 
+        if not self.connection: 
+            self._reconnect()
+
+        
+    # Create query 
+    # Ex. {"calories": 20, "carbs": 2}
+    # set_clauses generates: 
+    # "calories = calories + %s, carbs = carbs + %s"
+    # %s is place holder value for values 
+        set_clauses = ", ".join([f"{col} = {col} + %s" for col in increments.keys()])
+    
+    # Values creates a list of the values to be used by execute 
+    # order of values must match the set_clause
+        values = list(increments.values()) + [key_val]
+    
+    # Finish crafting the query 
+        query = f"UPDATE {table} SET {set_clauses} WHERE {key_col} = %s" 
+    
+        try: 
+        # Send command to SQL to inject values 
+            self.execute_query(query, values)
+        # Commit changes 
+            self.connection.commit()
+            print(f"[Success] Incremented values in '{table}'.")
+        except Exception as e: 
+            print("[ERROR] Failed to increment", e)
+            raise 
+        
+        
+        
+    def insert_recipe_ingredient(self, recipe_id: int, ingredient_id: int, quantity: float, quantity_unit: str) -> bool:
+        """
+        Insert a record into the RecipeIngredients table linking a recipe to an ingredient
+        along with the specified quantity and unit.
+
+        Parameters:
+            recipe_id (int): The ID of the recipe.
+            ingredient_id (int): The ID of the ingredient.
+            quantity (float): The quantity of the ingredient used in the recipe.
+            quantity_unit (str): The unit of measurement for the quantity (e.g., "g", "mL").
+
+        Example Usage:
+            success = db.insert_recipe_ingredient(1, 2, 100.0, "g")
+
+        Returns:
+            bool: True if insertion was successful, False otherwise.
+        """
+        self.connect()
+        cursor = None
+
+        # Double-check active connection before continuing
+        if not self.connection or not getattr(self.connection, "is_connected", lambda: False)():
+            print("[ERROR] No active database connection.")
+            return False
+
+        try:
+            cursor = self.connection.cursor()
+
+            query = """
+                INSERT INTO RecipeIngredients (recipe_ID, ingredient_ID, quantity, quantity_unit)
+                VALUES (%s, %s, %s, %s)
+            """
+            cursor.execute(query, (recipe_id, ingredient_id, quantity, quantity_unit))
+            self.connection.commit()
+
+            print(f"[SUCCESS] Linked ingredient ID {ingredient_id} to recipe ID {recipe_id}.")
+            return True
+        
+        except Error as e:
+            print(f"[ERROR] Failed to link ingredient to recipe: {e}")
+            self.connection.rollback()
+            return False
+        
+        except Exception as ex:
+            print(f"[ERROR] Unexpected failure during query: {ex}")
+            self.connection.rollback()
+            return False
+        
+        finally:
+            if cursor:
+                cursor.close()
+
+    def insert_recipe_ingredient_bulk(self, recipe_id: int, ingredients: List[Dict[str, Any]]) -> bool:
+        """
+        Insert multiple records into the RecipeIngredients table linking a recipe to multiple ingredients.
+
+        ingredients example:
+        [
+            {"ingredient_ID": 1, "quantity": 50.0, "quantity_unit": "g"},
+            {"ingredient_ID": 2, "quantity": 200.0, "quantity_unit": "mL"}
+        ]
+        """
+        self.connect
+        cursor = None
+
+        try:
+            self
+            cursor = self.connection.cursor()
+
+            query = """
+                INSERT INTO RecipeIngredients (recipe_ID, ingredient_ID, quantity, quantity_unit)
+                VALUES (%s, %s, %s, %s)
+            """
+
+            for ing in ingredients:
+                cursor.execute(query, (
+                    recipe_id, 
+                    ing["ingredient_ID"],
+                    ing["quantity"],
+                    ing["quantity_unit"]
+                ))
+
+            self.connection.commit()
+            print(f"[SUCCESS] Linked {len(ingredients)} ingredients to recipe ID {recipe_id}.")
+            return True
+        
+        except Error as e:
+            print(f"[ERROR] Failed to link ingredients to recipe: {e}")
+            self.connection.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+
+    
+    def insert_ingredient_object(self, ingredient: Ingredient) -> Optional[int]:
+        """
+        Insert an ingredient dataclass object into the Ingredients table.
+        Converts the Ingredient dataclass into a dictionary and automatically
+        maps field names to the corresponding SQL column.
+
+        Parameters:
+            ingredient (Ingredient): The Ingredient object to insert based on Aramaea's code.
+
+        Returns:
+            int or None: The auto_generated ingredient_ID if successful, None otherwise
+        """
+        self.connect()
+        cursor = None
+
+        # Double-check active connection before continuing
+        if not self.connection or not getattr(self.connection, "is_connected", lambda: False)():
+            print("[ERROR] No active database connection.")
+            return
+
+        try:
+            data = asdict(ingredient)
+
+            # Remove fields that aren't part of the Ingredients tab;e
+            data.pop("nutrients", None)
+
+            # Build the dictionary that matches the ingredients table
+            ingredient_data = {
+                # Basic Data
+                "ingredient_name": data.get("name"),
+                "serving_size_g": float(data.get("serving_size", 100.0)),
+                "promo": self._safe_float(data.get("local_promo")),
+                "promo_per_unit_estimate": self._safe_float(data.get("local_promo_per_unit_estimate")),
+                "national_price": float(data.get("national_regular", 0.0)),
+                "regular_per_unit_estimate": float(data.get("national_regular_per_unit_estimate", 0.0)),
+
+                # Macronutrients
+                "calories": self._safe_float(self._get_nutrient(data, "Calories")),
+                "protein": self._safe_float(self._get_nutrient(data, "Protein")),
+                "carbs": self._safe_float(self._get_nutrient(data, "Carbohydrate")),
+                "fats": self._safe_float(self._get_nutrient(data, "Total Fat")),
+                "fiber": self._safe_float(self._get_nutrient(data, "Fiber")),
+                "sugars": self._safe_float(self._get_nutrient(data, "Sugar")),
+
+                # Micronutrients
+                "vitamin_a": self._safe_float(self._get_nutrient(data, "Vitamin A")),
+                "vitamin_c": self._safe_float(self._get_nutrient(data, "Vitamin C")),
+                "vitamin_d": self._safe_float(self._get_nutrient(data, "Vitamin D")),
+                "calcium": self._safe_float(self._get_nutrient(data, "Calcium")),
+                "iron": self._safe_float(self._get_nutrient(data, "Iron")),
+                "potassium": self._safe_float(self._get_nutrient(data, "Potassium")),
+                "sodium": self._safe_float(self._get_nutrient(data, "Sodium")),
+                "magnesium": self._safe_float(self._get_nutrient(data, "Magnesium")),
+                "cholesterol": self._safe_float(self._get_nutrient(data, "Cholesterol")),
+                "saturated_fat": self._safe_float(self._get_nutrient(data, "Saturated Fat")),
+                "trans_fat": self._safe_float(self._get_nutrient(data, "Trans Fat"))
+            }
+
+            # Remove any None or empty entries
+            clean_data = {k: v for k, v in ingredient_data.items() if v not in (None, "", [])}
+
+            if not clean_data.get("ingredient_name"):
+                print("[ERROR] Ingredient object missing required 'name' field.")
+                return None
+            
+            new_id = self.insert_value("Ingredients", clean_data)
+            return new_id
+        
+        except Exception as e:
+            print(f"[ERROR] Failed to insert Ingredient object: {e}")
+            self.connection.rollback()
+            return None
+        finally:
+            if cursor:
+                cursor.close()
+        
+    # Helper: Safely convert to float
+    def _safe_float(self, value):
+        try:
+            if isinstance(value, str) and value.startswith("$"):
+                value = value.replace("$", "")
+            return float(value)
+        except (TypeError, ValueError):
+            print(f"[ERROR] Failed to safely convert value to float.")
+            return 0.0
+        
+    # Helper: Extract a nutrient value by displayName
+    def _get_nutrient(self, ingredient_data, nutrient_name):
+        for n in ingredient_data.get("nutrients", []):
+            if n.get("displayName", "").lower() == nutrient_name.lower():
+                return n.get("quantity", 0.0)
+        return 0.0
