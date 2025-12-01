@@ -1,11 +1,15 @@
 from MySQLHandler import MySQLHandler
 from ingredient import Ingredient
 from app import search_ingredients
+from app import createRecipe
+from app import addConnectionBetweenIngredientAndRecipe
+from app import addIngredientToRecipe
 from dotenv import load_dotenv
 import os
 import threading
 import json
 import py4j
+import app 
 from py4j.clientserver import ClientServer
 from py4j.clientserver import JavaParameters, PythonParameters
 
@@ -112,11 +116,15 @@ def main():
     )
     
     
+       # Connect the app db to the main one 
+    import app
+    app.db = db
+    
     # Hope's test
     
 
     print ("\n=== Connected to Database ===")
-    print("Attempt 3\n")
+    print("Attempt 4\n")
 
     # Insert sample ingredients
 
@@ -195,12 +203,14 @@ def main():
     '''
     print("\n=== Inserting Ingredient Object ===")
     
-    apples = search_ingredients("bread", 2)
+    apples = search_ingredients("milk", 2)
     apple = apples[0]
-    
-
+    print(apple.describe())
     ingredient_id = db.insert_ingredient_object(apple)
     print(f"Inserted Ingredient ID: {ingredient_id}")
+    recipe_id = createRecipe("pie!")
+    print(f"Inserted Recipe ID: {recipe_id}")
+    addIngredientToRecipe(recipe_id, ingredient_id, 2.0)
 
     # Fetch data to verify
     '''
@@ -223,6 +233,12 @@ def main():
     # Close the connection
     db.close()
     print(f"\n=== Database Connection Closed ===")
+
+
+    
+    
+    
+    
 
 
 
