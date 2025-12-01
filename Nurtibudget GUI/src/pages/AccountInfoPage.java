@@ -6,6 +6,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.nio.file.*;
+import java.nio.file.StandardCopyOption;
 
 //======================================================================================================================
 // Account Info Page
@@ -24,27 +25,29 @@ public class AccountInfoPage extends JPanel {
     // Constructor
     //==================================================================================================================
     public AccountInfoPage() {
-        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        setBackground(LIGHT_GRAY);
-        setBorder(new EmptyBorder(50, 50, 50, 50));
+        // Outer scroll pane to make the entire page scrollable
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(LIGHT_GRAY);
+        contentPanel.setBorder(new EmptyBorder(50, 50, 50, 50));
 
         JLabel title = new JLabel("Account Information", SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 26));
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
-        add(title);
-        add(Box.createVerticalStrut(30));
+        contentPanel.add(title);
+        contentPanel.add(Box.createVerticalStrut(30));
 
-        //--------------------------------------------------------------------------------------------------------------
+        // Commented out placeholder
         // Load Profile Picture
-        //--------------------------------------------------------------------------------------------------------------
+        /*
         defaultIcon = loadImageIcon(DEFAULT_IMAGE_PATH, 180, 180);
         userIcon = loadUserImage();
 
         profilePicLabel = new JLabel(userIcon != null ? userIcon : defaultIcon);
         profilePicLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         profilePicLabel.setBorder(new LineBorder(Color.GRAY, 2));
-        add(profilePicLabel);
-        add(Box.createVerticalStrut(20));
+        contentPanel.add(profilePicLabel);
+        contentPanel.add(Box.createVerticalStrut(20));
 
         //--------------------------------------------------------------------------------------------------------------
         // Buttons Panel (Change / Remove)
@@ -91,25 +94,173 @@ public class AccountInfoPage extends JPanel {
 
         btnPanel.add(changeBtn);
         btnPanel.add(removeBtn);
-        add(btnPanel);
-        add(Box.createVerticalStrut(40));
+        contentPanel.add(btnPanel);
+        contentPanel.add(Box.createVerticalStrut(40));
+        */
+        //--------------------------------------------------------------------------------------------------------------
+        // Dietary Restrictions Section
+        //--------------------------------------------------------------------------------------------------------------
+        JLabel dietLabel = new JLabel("Dietary Restrictions");
+        dietLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        dietLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        contentPanel.add(dietLabel);
+        contentPanel.add(Box.createVerticalStrut(20));
+
+        // Create checkboxes panel
+        JPanel checkboxPanel = new JPanel();
+        checkboxPanel.setLayout(new GridLayout(7, 2, 15, 15));
+        checkboxPanel.setBackground(LIGHT_GRAY);
+        checkboxPanel.setMaximumSize(new Dimension(400, 280));
+
+        JCheckBox[] dietaryCheckboxes = new JCheckBox[14];
+        String[] dietaryOptions = {
+            "Vegetarian", "Vegan", "Pescatarian", "Kosher",
+            "Halal", "No Dairy", "No Egg", "No Fish",
+            "No Shellfish", "No Tree Nuts", "No Peanuts",
+            "No Wheat/Gluten", "No Soy", "No Sesame"
+        };
+
+        for (int i = 0; i < dietaryOptions.length; i++) {
+            dietaryCheckboxes[i] = new JCheckBox(dietaryOptions[i]);
+            dietaryCheckboxes[i].setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            dietaryCheckboxes[i].setBackground(LIGHT_GRAY);
+            checkboxPanel.add(dietaryCheckboxes[i]);
+        }
+
+        JPanel checkboxWrapper = new JPanel();
+        checkboxWrapper.setLayout(new BoxLayout(checkboxWrapper, BoxLayout.X_AXIS));
+        checkboxWrapper.setBackground(LIGHT_GRAY);
+        checkboxWrapper.add(Box.createHorizontalGlue());
+        checkboxWrapper.add(checkboxPanel);
+        checkboxWrapper.add(Box.createHorizontalGlue());
+        contentPanel.add(checkboxWrapper);
+
+        contentPanel.add(Box.createVerticalStrut(20));
 
         //--------------------------------------------------------------------------------------------------------------
-        // Placeholder Account Info
+        // Submit Button and Display Textbox
         //--------------------------------------------------------------------------------------------------------------
-        JLabel nameLabel = new JLabel("Username: example_user");
-        JLabel emailLabel = new JLabel("Email: example@email.com");
-        nameLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        emailLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        JButton submitBtn = new JButton("Submit Changes");
+        submitBtn.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        submitBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        emailLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JTextArea displayTextArea = new JTextArea(12, 40);
+        displayTextArea.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        displayTextArea.setEditable(false);
+        displayTextArea.setLineWrap(true);
+        displayTextArea.setWrapStyleWord(true);
+        displayTextArea.setBackground(Color.WHITE);
+        displayTextArea.setBorder(new LineBorder(Color.GRAY, 1));
 
-        add(nameLabel);
-        add(Box.createVerticalStrut(10));
-        add(emailLabel);
+        JScrollPane scrollPane = new JScrollPane(displayTextArea);
+        scrollPane.setAlignmentX(Component.CENTER_ALIGNMENT);
+        scrollPane.setMaximumSize(new Dimension(400, 200));
+
+        //----------------------------------------------------------------------------------------------------------
+        // Macronutrients Section (grams/day) - integer inputs only
+        //----------------------------------------------------------------------------------------------------------
+        JLabel macrosLabel = new JLabel("Macronutrients (g/day):");
+        macrosLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        macrosLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        contentPanel.add(macrosLabel);
+        contentPanel.add(Box.createVerticalStrut(10));
+
+        JPanel macrosPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 6));
+        macrosPanel.setBackground(LIGHT_GRAY);
+
+        JLabel carbsLabel = new JLabel("Carbs:");
+        JTextField carbsField = new JTextField(6);
+        carbsLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        carbsField.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+
+        JLabel proteinLabel = new JLabel("Protein:");
+        JTextField proteinField = new JTextField(6);
+        proteinLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        proteinField.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+
+        JLabel fatLabel = new JLabel("Fat:");
+        JTextField fatField = new JTextField(6);
+        fatLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        fatField.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+
+        macrosPanel.add(carbsLabel);
+        macrosPanel.add(carbsField);
+        macrosPanel.add(proteinLabel);
+        macrosPanel.add(proteinField);
+        macrosPanel.add(fatLabel);
+        macrosPanel.add(fatField);
+
+        contentPanel.add(macrosPanel);
+        contentPanel.add(Box.createVerticalStrut(20));
+
+        // Helper lambda to display combined output
+        Runnable displayCombinedOutput = () -> {
+            StringBuilder combinedOutput = new StringBuilder();
+
+            // Get dietary restrictions
+            StringBuilder selectedRestrictions = new StringBuilder();
+            for (JCheckBox checkbox : dietaryCheckboxes) {
+                if (checkbox.isSelected()) {
+                    if (selectedRestrictions.length() > 0) {
+                        selectedRestrictions.append("\n");
+                    }
+                    selectedRestrictions.append("• ").append(checkbox.getText());
+                }
+            }
+
+            // Get macronutrients
+            try {
+                String carbsText = carbsField.getText().trim();
+                String proteinText = proteinField.getText().trim();
+                String fatText = fatField.getText().trim();
+
+                if (!carbsText.isEmpty() && !proteinText.isEmpty() && !fatText.isEmpty()) {
+                    int carbs = Integer.parseInt(carbsText);
+                    int protein = Integer.parseInt(proteinText);
+                    int fat = Integer.parseInt(fatText);
+
+                    if (selectedRestrictions.length() > 0) {
+                        combinedOutput.append("Dietary Restrictions:\n").append(selectedRestrictions).append("\n\n");
+                    }
+
+                    combinedOutput.append("Macronutrients (g/day):\n");
+                    combinedOutput.append("Carbs: ").append(carbs).append("\n");
+                    combinedOutput.append("Protein: ").append(protein).append("\n");
+                    combinedOutput.append("Fat: ").append(fat);
+                } else if (selectedRestrictions.length() > 0) {
+                    combinedOutput.append("Dietary Restrictions:\n").append(selectedRestrictions);
+                } else {
+                    combinedOutput.append("No dietary restrictions or macronutrients entered.");
+                }
+            } catch (NumberFormatException nfe) {
+                if (selectedRestrictions.length() > 0) {
+                    combinedOutput.append("Dietary Restrictions:\n").append(selectedRestrictions).append("\n\n");
+                    combinedOutput.append("⚠ Macronutrients: Please enter integer values (whole grams).");
+                } else {
+                    combinedOutput.append("⚠ Please enter integer values (whole grams) for macronutrients.");
+                }
+            }
+
+            displayTextArea.setText(combinedOutput.toString());
+        };
+
+        submitBtn.addActionListener(e -> displayCombinedOutput.run());
+
+        contentPanel.add(submitBtn);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(scrollPane);
+
+        // Add glue at the bottom to prevent stretching
+        contentPanel.add(Box.createVerticalGlue());
+
+        // Set up the page as a scrollable panel
+        setLayout(new BorderLayout());
+        JScrollPane pageScrollPane = new JScrollPane(contentPanel);
+        pageScrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        add(pageScrollPane, BorderLayout.CENTER);
     }
 
+    /*
     //==================================================================================================================
     // Load Existing Saved Profile Picture
     //==================================================================================================================
@@ -121,7 +272,7 @@ public class AccountInfoPage extends JPanel {
         }
         return null;
     }
-
+    
     //==================================================================================================================
     // Load Resource Image Icon
     //==================================================================================================================
@@ -136,4 +287,6 @@ public class AccountInfoPage extends JPanel {
             return null;
         }
     }
+    */
 }
+
