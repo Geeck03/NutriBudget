@@ -1,4 +1,7 @@
+import bridge.IKrogerWrapper;
 import java.awt.*;
+import java.sql.Connection;
+import java.sql.SQLException;
 import javax.swing.*;
 import pages.*;
 
@@ -17,6 +20,7 @@ public class Main {
     private final Color WHITE = Color.WHITE;
     private CardLayout cardLayout;
     private JPanel mainPanel;
+    private IKrogerWrapper krogerWrapper;
 
     //==============================================================================================================
     // Main Entry Point
@@ -123,7 +127,23 @@ public class Main {
         cardPanel.add(new Page4(), "Page4");
 
 
-        cardPanel.add(new SuggestionsPage(), "Suggestions");
+        // --- DB connection ---
+Connection dbConnection = null;
+String dbUrl = "jdbc:mysql://mysql-nutribudget.alwaysdata.net:3306/nutribudget_database";
+String dbUser = "442819";
+String dbPassword = "b3ntMouse51";
+
+try {
+    dbConnection = java.sql.DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+    System.out.println("✅ Connected to remote DB!");
+} catch (SQLException e) {
+    e.printStackTrace();
+}
+
+
+        // SuggestionsPage now expects both DB connection (null for now) and IKrogerWrapper
+        SuggestionsPage suggestionsPage = new SuggestionsPage(dbConnection, krogerWrapper);
+        cardPanel.add(suggestionsPage, "Suggestions");
 
         cardPanel.add(new AccountInfoPage(), "AccountInfo");
 
